@@ -9,6 +9,26 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FileCheckIcon, PlusIcon, EditIcon, CalendarDaysIcon } from 'lucide-vue-next';
 
+interface Props {
+  leaveTypes: Array<{
+    id: number;
+    name: string;
+    description: string;
+    days_allowed: number;
+    min_duration: number;
+    max_duration: number;
+    allow_custom_duration: boolean;
+    gender: string | null;
+    requires_approval: boolean;
+    requires_documentation: boolean;
+    full_pay_days: number;
+    half_pay_days: number;
+    is_active: boolean;
+  }>;
+}
+
+const props = defineProps<Props>();
+
 const page = usePage<SharedData>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -25,64 +45,7 @@ const isAdmin = computed(() => userRoles.value.includes('admin'));
 const isHR = computed(() => userRoles.value.includes('hr'));
 
 // Mock leave types data - this would come from the backend
-const leaveTypes = computed(() => [
-    {
-        id: 1,
-        name: 'Annual Leave',
-        description: 'Yearly vacation leave',
-        days_allowed: 21,
-        min_duration: 1,
-        max_duration: 21,
-        allow_custom_duration: true,
-        gender: null,
-        requires_approval: true,
-        requires_documentation: false,
-        full_pay_days: 21,
-        half_pay_days: 0,
-    },
-    {
-        id: 2,
-        name: 'Sick Leave',
-        description: 'Medical leave for illness',
-        days_allowed: 10,
-        min_duration: 1,
-        max_duration: 10,
-        allow_custom_duration: true,
-        gender: null,
-        requires_approval: false,
-        requires_documentation: true,
-        full_pay_days: 10,
-        half_pay_days: 0,
-    },
-    {
-        id: 3,
-        name: 'Maternity Leave',
-        description: 'Leave for new mothers',
-        days_allowed: 90,
-        min_duration: 30,
-        max_duration: 90,
-        allow_custom_duration: false,
-        gender: 'female',
-        requires_approval: true,
-        requires_documentation: true,
-        full_pay_days: 60,
-        half_pay_days: 30,
-    },
-    {
-        id: 4,
-        name: 'Paternity Leave',
-        description: 'Leave for new fathers',
-        days_allowed: 14,
-        min_duration: 7,
-        max_duration: 14,
-        allow_custom_duration: false,
-        gender: 'male',
-        requires_approval: true,
-        requires_documentation: false,
-        full_pay_days: 14,
-        half_pay_days: 0,
-    },
-]);
+const leaveTypes = computed(() => props.leaveTypes);
 
 const getPayDescription = (fullPay: number, halfPay: number) => {
     if (halfPay > 0) {
@@ -114,7 +77,7 @@ const getGenderBadge = (gender: string | null) => {
                 </div>
                 <div class="flex gap-2" v-if="isAdmin || isHR">
                     <Button as-child>
-                        <a :href="route('admin.leave-types.create')">
+                        <a :href="route('admin.settings.leave-types.store')">
                             <PlusIcon class="h-4 w-4 mr-2" />
                             Add Leave Type
                         </a>
@@ -300,7 +263,7 @@ const getGenderBadge = (gender: string | null) => {
                                 </TableCell>
                                 <TableCell>
                                     <Button variant="outline" size="sm" as-child>
-                                        <a :href="route('admin.leave-types.edit', leaveType.id)">
+                                        <a :href="route('admin.settings.leave-types.update', leaveType.id)">
                                             Edit
                                         </a>
                                     </Button>

@@ -85,18 +85,59 @@ class HandleInertiaRequests extends Middleware
           'is_active' => $user->company->is_active,
         ] : null,
         'abilities' => $user ? [
-          'viewDashboard' => $user->can('view dashboard'),
-          'manageUsers' => $user->can('manage users'),
-          'manageTeams' => $user->can('manage teams'),
-          'manageLeaveTypes' => $user->can('manage leave types'),
-          'viewReports' => $user->can('view reports'),
-          'createReports' => $user->can('create reports'),
-          'manageCompany' => $user->can('manage company'),
-          'viewAnalytics' => $user->can('view analytics'),
-          'approveLeave' => $user->can('approve leave requests'),
-          'rejectLeave' => $user->can('reject leave requests'),
-          'createLeaveRequests' => $user->can('create leave requests'),
-          'viewAllLeaveRequests' => $user->can('view all leave requests'),
+          // Leave Request Permissions
+          'createLeaveRequest' => $user->can('create_leave_request'),
+          'viewOwnLeaveRequest' => $user->can('view_own_leave_request'),
+          'viewTeamLeaveRequests' => $user->can('view_team_leave_requests'),
+          'viewAllLeaveRequests' => $user->can('view_all_leave_requests'),
+          'editOwnLeaveRequest' => $user->can('edit_own_leave_request'),
+          'editTeamLeaveRequests' => $user->can('edit_team_leave_requests'),
+          'editAllLeaveRequests' => $user->can('edit_all_leave_requests'),
+          'deleteOwnLeaveRequest' => $user->can('delete_own_leave_request'),
+          'deleteTeamLeaveRequests' => $user->can('delete_team_leave_requests'),
+          'deleteAllLeaveRequests' => $user->can('delete_all_leave_requests'),
+          'approveLeaveRequest' => $user->can('approve_leave_request'),
+          'rejectLeaveRequest' => $user->can('reject_leave_request'),
+          'cancelLeaveRequest' => $user->can('cancel_leave_request'),
+
+          // Leave Type Permissions
+          'viewLeaveTypes' => $user->can('view_leave_types'),
+          'createLeaveTypes' => $user->can('create_leave_types'),
+          'editLeaveTypes' => $user->can('edit_leave_types'),
+          'deleteLeaveTypes' => $user->can('delete_leave_types'),
+
+          // User Management Permissions
+          'viewUsers' => $user->can('view_users'),
+          'createUsers' => $user->can('create_users'),
+          'editUsers' => $user->can('edit_users'),
+          'deleteUsers' => $user->can('delete_users'),
+          'assignRoles' => $user->can('assign_roles'),
+          'manageUserPermissions' => $user->can('manage_user_permissions'),
+
+          // Team Management Permissions
+          'viewTeams' => $user->can('view_teams'),
+          'createTeams' => $user->can('create_teams'),
+          'editTeams' => $user->can('edit_teams'),
+          'deleteTeams' => $user->can('delete_teams'),
+          'assignTeamMembers' => $user->can('assign_team_members'),
+
+          // Company Management Permissions
+          'viewCompanyProfile' => $user->can('view_company_profile'),
+          'editCompanyProfile' => $user->can('edit_company_profile'),
+          'manageCompanySettings' => $user->can('manage_company_settings'),
+          'viewCompanyStatistics' => $user->can('view_company_statistics'),
+          'manageCompanySubscription' => $user->can('manage_company_subscription'),
+
+          // System Administration
+          'manageAllCompanies' => $user->can('manage_all_companies'),
+          'viewSystemLogs' => $user->can('view_system_logs'),
+          'manageSystemSettings' => $user->can('manage_system_settings'),
+          'impersonateUsers' => $user->can('impersonate_users'),
+
+          // Reports and Analytics
+          'viewReports' => $user->can('view_reports'),
+          'exportData' => $user->can('export_data'),
+          'viewAnalytics' => $user->can('view_analytics'),
         ] : [],
       ],
       'ziggy' => [

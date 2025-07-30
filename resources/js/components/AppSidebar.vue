@@ -23,6 +23,10 @@ import {
   Building2,
   Settings,
   HelpCircle,
+  Users,
+  UserCog,
+  Shield,
+  Database
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -32,25 +36,26 @@ const page = usePage<SharedData>();
 const userRoles = computed(() => page.props.auth.user?.roles?.map(role => role.name) || []);
 const userAbilities = computed(() => page.props.auth.abilities || {});
 
-// Role-based checks (for backwards compatibility)
+// Role-based checks
 const isAdmin = computed(() => userRoles.value.includes('admin'));
 const isHR = computed(() => userRoles.value.includes('hr'));
 const isManager = computed(() => userRoles.value.includes('manager'));
-const isSuperAdmin = computed(() => userRoles.value.includes('super-admin'));
+const isSuperAdmin = computed(() => userAbilities.value.manageSystemSettings);
+const isEmployee = computed(() => userRoles.value.includes('employee'));
 
 // Main navigation items (ability-aware)
 const mainNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [];
 
-  // Dashboard is always visible but the route differs based on role
+  // Dashboard - role-based routing
   items.push({
     title: 'Dashboard',
-    href: isAdmin.value ? route('admin.dashboard') : route('dashboard'),
+    href: (isAdmin.value || isHR.value) ? route('admin.dashboard') : route('dashboard'),
     icon: HomeIcon
   });
 
-  // Leave requests
-  if (userAbilities.value.createLeaveRequests) {
+  // Leave Requests - available to all users who can create leave requests
+  if (userAbilities.value.createLeaveRequest || userAbilities.value.viewOwnLeaveRequest) {
     items.push({
       title: 'Leave Requests',
       href: route('leave-requests.index'),
@@ -58,74 +63,41 @@ const mainNavItems = computed((): NavItem[] => {
     });
   }
 
-  // Leave types
-  if (userAbilities.value.manageLeaveTypes) {
+  // Team Leave Requests - only for managers
+  if (isManager.value && userAbilities.value.viewTeamLeaveRequests) {
     items.push({
-      title: 'Leave Types',
-      href: route('leave-types.index'),
+      title: 'Team Requests',
+      href: route('team.leave-requests.index'),
+      icon: Users
+    });
+  }
+
+  // Admin Leave Management - for admins/HR
+  if (userAbilities.value.viewAllLeaveRequests) {
+    items.push({
+      title: 'All Leave Requests',
+      href: route('admin.leave-requests.index'),
       icon: FileCheckIcon
     });
   }
 
-  return items;
-});
-
-// Admin/Management navigation items
-const adminNavItems = computed((): NavItem[] => {
-  const items: NavItem[] = [];
-
-  // User Management
-  if (userAbilities.value.manageUsers) {
-    items.push({
-      title: 'User Management',
-      href: route('admin.users.index'),
-      icon: UsersIcon
-    });
-  }
-
-  // Team Management
-  if (userAbilities.value.manageTeams) {
-    items.push({
-      title: 'Team Management',
-      href: route('admin.teams.index'),
-      icon: Building2
-    });
-  }
-
-  // Leave Types Admin
-  if (userAbilities.value.manageLeaveTypes) {
-    items.push({
-      title: 'Leave Types Admin',
-      href: route('admin.leave-types.index'),
-      icon: FileCheckIcon
-    });
-  }
-
-  // Reports
+  // Reports - role-based routing
   if (userAbilities.value.viewReports) {
     items.push({
       title: 'Reports',
-      href: route('admin.reports.index'),
+      href: (isAdmin.value || isHR.value) ? route('admin.reports.index') : route('employee.reports.index'),
+      icon: BarChart3
+    });
+  } else {
+    // Personal reports for employees who can't access admin reports
+    items.push({
+      title: 'My Reports',
+      href: route('employee.reports.index'),
       icon: BarChart3
     });
   }
 
-  // Company Profile
-  if (userAbilities.value.manageCompany) {
-    items.push({
-      title: 'Company Profile',
-      href: route('admin.company.profile'),
-      icon: Building2
-    });
-
-    items.push({
-      title: 'Company Employees',
-      href: route('admin.company.employees'),
-      icon: UsersIcon
-    });
-  }
-
-  // Analytics
+  // Analytics - admin only
   if (userAbilities.value.viewAnalytics) {
     items.push({
       title: 'Analytics',
@@ -137,40 +109,133 @@ const adminNavItems = computed((): NavItem[] => {
   return items;
 });
 
-// Footer navigation items (useful system links)
+// Management navigation items (for admins/HR)
+const managementNavItems = computed((): NavItem[] => {
+  if (!isAdmin.value && !isHR.value && !isSuperAdmin.value) return [];
+
+  const items: NavItem[] = [];
+
+  // Company Management
+  if (userAbilities.value.viewCompanyProfile) {
+    items.push({
+      title: 'Company',
+      href: route('admin.settings.company'),
+      icon: Building2
+    });
+  }
+
+  // User Management
+  if (userAbilities.value.viewUsers) {
+    items.push({
+      title: 'Users',
+      href: route('admin.settings.users'),
+      icon: UserCog
+    });
+  }
+
+  // Team Management
+  if (userAbilities.value.viewTeams) {
+    items.push({
+      title: 'Teams',
+      href: route('admin.settings.teams'),
+      icon: Users
+    });
+  }
+
+  // Leave Types
+  if (userAbilities.value.viewLeaveTypes) {
+    items.push({
+      title: 'Leave Types',
+      href: route('admin.settings.leave-types'),
+      icon: FileCheckIcon
+    });
+  }
+
+  // Roles & Permissions
+  if (userAbilities.value.assignRoles) {
+    items.push({
+      title: 'Roles & Permissions',
+      href: route('admin.settings.roles'),
+      icon: Shield
+    });
+  }
+
+  return items;
+});
+
+// System navigation items (for super admin)
+const systemNavItems = computed((): NavItem[] => {
+  if (!isSuperAdmin.value) return [];
+
+  const items: NavItem[] = [];
+
+  items.push({
+    title: 'System Settings',
+    href: route('settings.system'),
+    icon: Settings
+  });
+
+  if (userAbilities.value.manageAllCompanies) {
+    items.push({
+      title: 'Companies',
+      href: route('settings.companies'),
+      icon: Database
+    });
+  }
+
+  if (userAbilities.value.viewSystemLogs) {
+    items.push({
+      title: 'System Logs',
+      href: route('settings.logs'),
+      icon: BarChart3
+    });
+  }
+
+  return items;
+});
+
+// Footer navigation items
 const footerNavItems = computed((): NavItem[] => [
   {
-    title: 'Profile Settings',
-    href: route('profile.edit'),
+    title: 'Settings',
+    href: isSuperAdmin.value ? route('settings.system') :
+          (isAdmin.value || isHR.value) ? route('settings.profile') :
+          route('employee.settings.profile'),
     icon: Settings
   },
   {
-    title: 'Help & Support',
-    href: '#', // This could link to a help page or documentation
+    title: 'Help',
+    href: '#',
     icon: HelpCircle
   }
 ]);
 
-// Dashboard link for header (role-aware)
-const dashboardRoute = computed(() =>
-  isAdmin.value ? route('admin.dashboard') : route('dashboard')
-);
+// Combine all nav items for the main navigation
+const allNavItems = computed(() => [
+  ...mainNavItems.value,
+  ...(managementNavItems.value.length > 0 ? [{ title: '---' }] : []),
+  ...managementNavItems.value,
+  ...(systemNavItems.value.length > 0 ? [{ title: '---' }] : []),
+  ...systemNavItems.value,
+]);
 </script>
 
 <template>
-  <Sidebar collapsible="icon" variant="inset">
+  <Sidebar>
     <SidebarHeader>
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton size="lg" as-child>
-            <Link :href="dashboardRoute">
+            <Link :href="(isAdmin || isHR) ? route('admin.dashboard') : route('dashboard')">
+              <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <Building2 class="size-4" />
+              </div>
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">
-                  {{ page.props.auth.company?.name || 'LeaveHub' }}
+                  {{ $page.props.auth.company?.name || 'LeaveHub' }}
                 </span>
-
                 <span class="truncate text-xs">
-                  {{ page.props.auth.user?.name }}
+                  {{ isSuperAdmin ? 'Super Admin' : isAdmin ? 'Admin' : isHR ? 'HR' : isManager ? 'Manager' : 'Employee' }}
                 </span>
               </div>
             </Link>
@@ -180,39 +245,12 @@ const dashboardRoute = computed(() =>
     </SidebarHeader>
 
     <SidebarContent>
-      <!-- Main Navigation -->
-      <NavMain :items="mainNavItems" />
-
-      <!-- Admin/Management Navigation -->
-      <NavMain
-        v-if="adminNavItems.length > 0"
-        :items="adminNavItems"
-        title="Management"
-      />
-
-      <!-- Super Admin Navigation (if needed) -->
-      <NavMain
-        v-if="isSuperAdmin"
-        :items="[
-          {
-            title: 'System Analytics',
-            href: '#', // Could be a system-wide analytics page
-            icon: BarChart3
-          },
-          {
-            title: 'All Companies',
-            href: '#', // Could be a page to manage all companies
-            icon: Building2
-          }
-        ]"
-        title="System Admin"
-      />
+      <NavMain :items="allNavItems" />
     </SidebarContent>
 
     <SidebarFooter>
-      <NavFooter :items="footerNavItems" />
       <NavUser />
+      <NavFooter :items="footerNavItems" />
     </SidebarFooter>
   </Sidebar>
-  <slot />
 </template>

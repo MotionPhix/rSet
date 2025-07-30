@@ -17,10 +17,10 @@ class LeavesSeeder extends Seeder
 
     foreach ($companies as $company) {
       $users = User::where('company_id', $company->id)
-                  ->whereHas('roles', function($query) {
-                    $query->whereIn('name', ['employee', 'manager']);
-                  })
-                  ->get();
+        ->whereHas('roles', function ($query) {
+          $query->whereIn('name', ['employee', 'manager']);
+        })
+        ->get();
 
       $leaveTypes = LeaveType::where('company_id', $company->id)->get();
 
@@ -126,11 +126,11 @@ class LeavesSeeder extends Seeder
         $approver = null;
         if ($status !== 'pending') {
           $approvers = User::where('company_id', $company->id)
-                          ->whereHas('roles', function($query) {
-                            $query->whereIn('name', ['manager', 'hr', 'admin']);
-                          })
-                          ->where('id', '!=', $user->id)
-                          ->get();
+            ->whereHas('roles', function ($query) {
+              $query->whereIn('name', ['manager', 'hr', 'admin']);
+            })
+            ->where('id', '!=', $user->id)
+            ->get();
 
           if ($approvers->isNotEmpty()) {
             $approver = $approvers->random();

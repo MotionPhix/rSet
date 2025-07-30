@@ -2,142 +2,108 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\Admin\ReportController;
 
 Route::middleware(['auth', 'verified', 'company.context', 'role:admin,hr'])->prefix('admin')->group(function () {
 
-  // Admin dashboard route (admin only)
-  Route::get('/dashboard', function () {
-    return Inertia::render('admin/Dashboard');
-  })->name('admin.dashboard')->middleware('role:admin');
+    // ============================================
+    // ADMIN DASHBOARD
+    // ============================================
+    Route::get('/dashboard', function () {
+        return Inertia::render('admin/Dashboard');
+    })->name('admin.dashboard')->middleware('role:admin');
 
-  // User management routes (admin, hr)
-  Route::middleware(['role:admin,hr'])->group(function () {
-    Route::get('/users', function () {
-      return Inertia::render('admin/users/Index');
-    })->name('admin.users.index');
+    // ============================================
+    // REPORTS & ANALYTICS (Admin/HR)
+    // ============================================
+    Route::middleware(['can:view_reports'])->group(function () {
+        Route::get('/reports', [ReportController::class, 'index'])->name('admin.reports.index');
+        Route::post('/reports/generate', [ReportController::class, 'generate'])->name('admin.reports.generate');
+        Route::post('/reports/export', [ReportController::class, 'export'])->name('admin.reports.export');
+    });
 
-    Route::get('/users/create', function () {
-      return Inertia::render('admin/users/Create');
-    })->name('admin.users.create');
+    Route::middleware(['can:view_analytics'])->group(function () {
+        Route::get('/analytics', function () {
+            return Inertia::render('admin/analytics/Index');
+        })->name('admin.analytics.index');
+    });
 
-    Route::post('/users', function () {
-      // Handle user creation
-      return redirect()->route('admin.users.index');
-    })->name('admin.users.store');
+    // ============================================
+    // LEAVE REQUEST MANAGEMENT (Admin/HR)
+    // ============================================
+    Route::middleware(['can:view_all_leave_requests'])->group(function () {
+        Route::get('/leave-requests', function () {
+            return Inertia::render('admin/leave-requests/Index');
+        })->name('admin.leave-requests.index');
 
-    Route::get('/users/{user}/edit', function () {
-      return Inertia::render('admin/users/Edit');
-    })->name('admin.users.edit');
+        Route::get('/leave-requests/{leaveRequest}', function () {
+            return Inertia::render('admin/leave-requests/Show');
+        })->name('admin.leave-requests.show');
+    });
 
-    Route::put('/users/{user}', function () {
-      // Handle user update
-      return redirect()->route('admin.users.index');
-    })->name('admin.users.update');
+    Route::middleware(['can:approve_leave_request'])->group(function () {
+        Route::post('/leave-requests/{leaveRequest}/approve', function () {
+            // Handle leave request approval
+            return redirect()->route('admin.leave-requests.index');
+        })->name('admin.leave-requests.approve');
+    });
 
-    Route::delete('/users/{user}', function () {
-      // Handle user deletion
-      return redirect()->route('admin.users.index');
-    })->name('admin.users.destroy');
+    Route::middleware(['can:reject_leave_request'])->group(function () {
+        Route::post('/leave-requests/{leaveRequest}/reject', function () {
+            // Handle leave request rejection
+            return redirect()->route('admin.leave-requests.index');
+        })->name('admin.leave-requests.reject');
+    });
 
-    // API endpoint for user list
-    Route::get(
-      '/api/users',
-      [App\Http\Controllers\Admin\UserApiController::class, 'list']
-    )->name('admin.users.list');
-  });
+    // ============================================
+    // ADMIN SETTINGS (Moved from general settings)
+    // ============================================
+    Route::prefix('settings')->group(function () {
+        // Company Management (Admin only)
+        Route::middleware(['can:view_company_profile'])->group(function () {
+            Route::get('/company', [App\Http\Controllers\Settings\CompanyController::class, 'index'])->name('admin.settings.company');
+            Route::patch('/company', [App\Http\Controllers\Settings\CompanyController::class, 'update'])
+                ->middleware('can:edit_company_profile')->name('admin.settings.company.update');
+        });
 
-  // Team management routes (admin, hr)
-  Route::middleware(['role:admin,hr'])->group(function () {
-    Route::get('/teams', function () {
-      return Inertia::render('admin/teams/Index');
-    })->name('admin.teams.index');
+        // User Management
+        Route::middleware(['can:view_users'])->group(function () {
+            Route::get('/users', [App\Http\Controllers\Settings\UserController::class, 'index'])->name('admin.settings.users');
+            Route::post('/users', [App\Http\Controllers\Settings\UserController::class, 'store'])
+                ->middleware('can:create_users')->name('admin.settings.users.store');
+            Route::patch('/users/{user}', [App\Http\Controllers\Settings\UserController::class, 'update'])
+                ->middleware('can:edit_users')->name('admin.settings.users.update');
+            Route::delete('/users/{user}', [App\Http\Controllers\Settings\UserController::class, 'destroy'])
+                ->middleware('can:delete_users')->name('admin.settings.users.destroy');
+        });
 
-    Route::get('/teams/create', function () {
-      return Inertia::render('admin/teams/Create');
-    })->name('admin.teams.create');
+        // Team Management
+        Route::middleware(['can:view_teams'])->group(function () {
+            Route::get('/teams', [App\Http\Controllers\Settings\TeamController::class, 'index'])->name('admin.settings.teams');
+            Route::post('/teams', [App\Http\Controllers\Settings\TeamController::class, 'store'])
+                ->middleware('can:create_teams')->name('admin.settings.teams.store');
+            Route::patch('/teams/{team}', [App\Http\Controllers\Settings\TeamController::class, 'update'])
+                ->middleware('can:edit_teams')->name('admin.settings.teams.update');
+            Route::delete('/teams/{team}', [App\Http\Controllers\Settings\TeamController::class, 'destroy'])
+                ->middleware('can:delete_teams')->name('admin.settings.teams.destroy');
+        });
 
-    Route::post('/teams', function () {
-      // Handle team creation
-      return redirect()->route('admin.teams.index');
-    })->name('admin.teams.store');
+        // Leave Types Management
+        Route::middleware(['can:view_leave_types'])->group(function () {
+            Route::get('/leave-types', [App\Http\Controllers\Settings\LeaveTypeController::class, 'index'])->name('admin.settings.leave-types');
+            Route::post('/leave-types', [App\Http\Controllers\Settings\LeaveTypeController::class, 'store'])
+                ->middleware('can:create_leave_types')->name('admin.settings.leave-types.store');
+            Route::patch('/leave-types/{leaveType}', [App\Http\Controllers\Settings\LeaveTypeController::class, 'update'])
+                ->middleware('can:edit_leave_types')->name('admin.settings.leave-types.update');
+            Route::delete('/leave-types/{leaveType}', [App\Http\Controllers\Settings\LeaveTypeController::class, 'destroy'])
+                ->middleware('can:delete_leave_types')->name('admin.settings.leave-types.destroy');
+        });
 
-    Route::get('/teams/{team}/edit', function () {
-      return Inertia::render('admin/teams/Edit');
-    })->name('admin.teams.edit');
-
-    Route::put('/teams/{team}', function () {
-      // Handle team update
-      return redirect()->route('admin.teams.index');
-    })->name('admin.teams.update');
-
-    Route::delete('/teams/{team}', function () {
-      // Handle team deletion
-      return redirect()->route('admin.teams.index');
-    })->name('admin.teams.destroy');
-
-    // API endpoint for team list
-    Route::get(
-      '/api/teams',
-      [App\Http\Controllers\Admin\TeamApiController::class, 'list']
-    )->name('admin.teams.list');
-  });
-
-  // Leave type management routes (admin, hr)
-  Route::middleware(['role:admin,hr'])->group(function () {
-    Route::get('/leave-types', function () {
-      return Inertia::render('admin/leave-types/Index');
-    })->name('admin.leave-types.index');
-
-    Route::get('/leave-types/create', function () {
-      return Inertia::render('admin/leave-types/Create');
-    })->name('admin.leave-types.create');
-
-    Route::post('/leave-types', function () {
-      // Handle leave type creation
-      return redirect()->route('admin.leave-types.index');
-    })->name('admin.leave-types.store');
-
-    Route::get('/leave-types/{leaveType}/edit', function () {
-      return Inertia::render('admin/leave-types/Edit');
-    })->name('admin.leave-types.edit');
-
-    Route::put('/leave-types/{leaveType}', function () {
-      // Handle leave type update
-      return redirect()->route('admin.leave-types.index');
-    })->name('admin.leave-types.update');
-
-    Route::delete('/leave-types/{leaveType}', function () {
-      // Handle leave type deletion
-      return redirect()->route('admin.leave-types.index');
-    })->name('admin.leave-types.destroy');
-
-    // API endpoint for leave type list
-    Route::get('/api/leave-types', [App\Http\Controllers\Admin\LeaveTypeApiController::class, 'list'])->name('admin.leave-types.list');
-  });
-
-  // Company management routes (admin only)
-  Route::middleware(['role:admin'])->group(function () {
-    Route::get('/company/profile', function () {
-      return Inertia::render('admin/company/Profile');
-    })->name('admin.company.profile');
-
-    Route::get('/company/employees', function () {
-      return Inertia::render('admin/company/Employees');
-    })->name('admin.company.employees');
-  });
-
-  // Reports routes (admin, hr)
-  Route::middleware(['role:admin,hr'])->group(function () {
-    Route::get('/reports', [App\Http\Controllers\Admin\ReportController::class, 'index'])->name('admin.reports.index');
-    Route::post('/reports/generate', [App\Http\Controllers\Admin\ReportController::class, 'generate'])->name('admin.reports.generate');
-    Route::post('/reports/export', [App\Http\Controllers\Admin\ReportController::class, 'export'])->name('admin.reports.export');
-  });
-
-  // Analytics routes (admin only)
-  Route::middleware(['role:admin'])->group(function () {
-    Route::get('/analytics', function () {
-      return Inertia::render('admin/analytics/Index');
-    })->name('admin.analytics.index');
-  });
-
+        // Roles & Permissions
+        Route::middleware(['can:assign_roles'])->group(function () {
+            Route::get('/roles', [App\Http\Controllers\Settings\RoleController::class, 'index'])->name('admin.settings.roles');
+            Route::patch('/roles/{role}/permissions', [App\Http\Controllers\Settings\RoleController::class, 'updatePermissions'])
+                ->middleware('can:manage_user_permissions')->name('admin.settings.roles.permissions');
+        });
+    });
 });

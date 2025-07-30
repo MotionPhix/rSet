@@ -29,34 +29,23 @@ class DatabaseSeeder extends Seeder
     // Seed in the correct order due to foreign key constraints
     $this->call([
       RolesAndPermissionsSeeder::class,  // 1. Create roles and permissions first
-      CompanySeeder::class,              // 2. Create companies
-      TeamsSeeder::class,                // 3. Create teams (depends on companies)
-      LeaveTypesSeeder::class,           // 4. Create leave types (depends on companies)
-      UsersSeeder::class,                // 5. Create users (depends on companies and teams)
-      LeavesSeeder::class,               // 6. Create leave requests (depends on users and leave types)
+      DemoDataSeeder::class,             // 2. Create demo company, teams, and users
+      LeaveTypesSeeder::class,           // 3. Create leave types
+      LeaveRequestsSeeder::class,        // 4. Create sample leave requests
     ]);
 
     $this->command->info('✅ Database seeding completed successfully!');
     $this->command->info('');
     $this->command->info('📊 Sample data created:');
-    $this->command->info('   • 5 Companies with different subscription plans');
-    $this->command->info('   • 6 Teams per company (HR, Engineering, Marketing, Sales, Design, Finance)');
-    $this->command->info('   • 8 Leave types per company (Annual, Sick, Maternity, Paternity, etc.)');
-    $this->command->info('   • 20+ Users per company with different roles');
-    $this->command->info('   • 100+ Leave requests with various statuses and dates');
+    $this->command->info('   • Demo company with 6 teams');
+    $this->command->info('   • 6 Leave types with different configurations');
+    $this->command->info('   • 8 Users with different roles (admin, hr, managers, employees)');
+    $this->command->info('   • 30+ Leave requests with various statuses and dates');
     $this->command->info('');
     $this->command->info('🔑 Login credentials:');
-    $this->command->info('   Super Admin: superadmin@leavehub.com / password');
-    $this->command->info('   Company Admin: admin@techcorp.com / password');
-    $this->command->info('   HR Manager: hr@techcorp.com / password');
-    $this->command->info('   Team Manager: engineering.manager@techcorp.com / password');
-    $this->command->info('   Employee: alice.johnson@techcorp.com / password');
-    $this->command->info('');
-    $this->command->info('🏢 Companies created:');
-    $this->command->info('   • TechCorp Solutions (Premium plan)');
-    $this->command->info('   • Global Innovations Ltd (Standard plan)');
-    $this->command->info('   • StartupHub Inc (Basic plan)');
-    $this->command->info('   • Creative Agency Pro (Standard plan)');
-    $this->command->info('   • Manufacturing Corp (Premium plan)');
+    $this->command->info('   Admin: admin@democompany.com / password');
+    $this->command->info('   HR Manager: hr@democompany.com / password');
+    $this->command->info('   Manager: bob@democompany.com / password');
+    $this->command->info('   Employee: charlie@democompany.com / password');
   }
 }
