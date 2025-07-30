@@ -28,81 +28,110 @@ import { computed } from 'vue';
 
 const page = usePage<SharedData>();
 
-console.log('AppSidebar mounted', page.props.auth.user?.roles);
-
-// Get user roles for navigation filtering
+// Get user roles and abilities for navigation filtering
 const userRoles = computed(() => page.props.auth.user?.roles?.map(role => role.name) || []);
+const userAbilities = computed(() => page.props.auth.abilities || {});
+
+// Role-based checks (for backwards compatibility)
 const isAdmin = computed(() => userRoles.value.includes('admin'));
 const isHR = computed(() => userRoles.value.includes('hr'));
 const isManager = computed(() => userRoles.value.includes('manager'));
 const isSuperAdmin = computed(() => userRoles.value.includes('super-admin'));
 
-// Main navigation items (role-aware)
-const mainNavItems = computed((): NavItem[] => [
-  {
+// Main navigation items (ability-aware)
+const mainNavItems = computed((): NavItem[] => {
+  const items: NavItem[] = [];
+
+  // Dashboard is always visible but the route differs based on role
+  items.push({
     title: 'Dashboard',
     href: isAdmin.value ? route('admin.dashboard') : route('dashboard'),
     icon: HomeIcon
-  },
-  {
-    title: 'Leave Requests',
-    href: route('leave-requests.index'),
-    icon: CalendarIcon
-  },
-  {
-    title: 'Leave Types',
-    href: route('leave-types.index'),
-    icon: FileCheckIcon
+  });
+
+  // Leave requests
+  if (userAbilities.value.createLeaveRequests) {
+    items.push({
+      title: 'Leave Requests',
+      href: route('leave-requests.index'),
+      icon: CalendarIcon
+    });
   }
-]);
+
+  // Leave types
+  if (userAbilities.value.manageLeaveTypes) {
+    items.push({
+      title: 'Leave Types',
+      href: route('leave-types.index'),
+      icon: FileCheckIcon
+    });
+  }
+
+  return items;
+});
 
 // Admin/Management navigation items
 const adminNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [];
 
-  if (isAdmin.value || isHR.value) {
-    items.push(
-      {
-        title: 'User Management',
-        href: route('admin.users.index'),
-        icon: UsersIcon
-      },
-      {
-        title: 'Team Management',
-        href: route('admin.teams.index'),
-        icon: Building2
-      },
-      {
-        title: 'Leave Types Admin',
-        href: route('admin.leave-types.index'),
-        icon: FileCheckIcon
-      },
-      {
-        title: 'Reports',
-        href: route('admin.reports.index'),
-        icon: BarChart3
-      }
-    );
+  // User Management
+  if (userAbilities.value.manageUsers) {
+    items.push({
+      title: 'User Management',
+      href: route('admin.users.index'),
+      icon: UsersIcon
+    });
   }
 
-  if (isAdmin.value) {
-    items.push(
-      {
-        title: 'Company Profile',
-        href: route('admin.company.profile'),
-        icon: Building2
-      },
-      {
-        title: 'Company Employees',
-        href: route('admin.company.employees'),
-        icon: UsersIcon
-      },
-      {
-        title: 'Analytics',
-        href: route('admin.analytics.index'),
-        icon: LayoutGrid
-      }
-    );
+  // Team Management
+  if (userAbilities.value.manageTeams) {
+    items.push({
+      title: 'Team Management',
+      href: route('admin.teams.index'),
+      icon: Building2
+    });
+  }
+
+  // Leave Types Admin
+  if (userAbilities.value.manageLeaveTypes) {
+    items.push({
+      title: 'Leave Types Admin',
+      href: route('admin.leave-types.index'),
+      icon: FileCheckIcon
+    });
+  }
+
+  // Reports
+  if (userAbilities.value.viewReports) {
+    items.push({
+      title: 'Reports',
+      href: route('admin.reports.index'),
+      icon: BarChart3
+    });
+  }
+
+  // Company Profile
+  if (userAbilities.value.manageCompany) {
+    items.push({
+      title: 'Company Profile',
+      href: route('admin.company.profile'),
+      icon: Building2
+    });
+
+    items.push({
+      title: 'Company Employees',
+      href: route('admin.company.employees'),
+      icon: UsersIcon
+    });
+  }
+
+  // Analytics
+  if (userAbilities.value.viewAnalytics) {
+    items.push({
+      title: 'Analytics',
+      href: route('admin.analytics.index'),
+      icon: LayoutGrid
+    });
   }
 
   return items;

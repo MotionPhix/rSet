@@ -61,10 +61,8 @@ class HandleInertiaRequests extends Middleware
             return [
               'id' => $role->id,
               'name' => $role->name,
-              'permissions' => $role->permissions->pluck('name')->toArray(),
             ];
           }),
-          'permissions' => $user->getAllPermissions()->pluck('name')->toArray(),
           'team' => $user->team ? [
             'id' => $user->team->id,
             'name' => $user->team->name,
@@ -86,6 +84,20 @@ class HandleInertiaRequests extends Middleware
           'subscription_expires_at' => $user->company->subscription_expires_at,
           'is_active' => $user->company->is_active,
         ] : null,
+        'abilities' => $user ? [
+          'viewDashboard' => $user->can('view dashboard'),
+          'manageUsers' => $user->can('manage users'),
+          'manageTeams' => $user->can('manage teams'),
+          'manageLeaveTypes' => $user->can('manage leave types'),
+          'viewReports' => $user->can('view reports'),
+          'createReports' => $user->can('create reports'),
+          'manageCompany' => $user->can('manage company'),
+          'viewAnalytics' => $user->can('view analytics'),
+          'approveLeave' => $user->can('approve leave requests'),
+          'rejectLeave' => $user->can('reject leave requests'),
+          'createLeaveRequests' => $user->can('create leave requests'),
+          'viewAllLeaveRequests' => $user->can('view all leave requests'),
+        ] : [],
       ],
       'ziggy' => [
         ...(new Ziggy)->toArray(),

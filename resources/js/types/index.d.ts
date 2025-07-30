@@ -5,6 +5,22 @@ import type { Config } from 'ziggy-js';
 export interface Auth {
   user: User | null;
   company: Company | null;
+  abilities: Abilities;
+}
+
+export interface Abilities {
+  viewDashboard: boolean;
+  manageUsers: boolean;
+  manageTeams: boolean;
+  manageLeaveTypes: boolean;
+  viewReports: boolean;
+  createReports: boolean;
+  manageCompany: boolean;
+  viewAnalytics: boolean;
+  approveLeave: boolean;
+  rejectLeave: boolean;
+  createLeaveRequests: boolean;
+  viewAllLeaveRequests: boolean;
 }
 
 export interface BreadcrumbItem {

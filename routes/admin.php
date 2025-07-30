@@ -38,6 +38,12 @@ Route::middleware(['auth', 'verified', 'company.context', 'role:admin,hr'])->pre
       // Handle user deletion
       return redirect()->route('admin.users.index');
     })->name('admin.users.destroy');
+
+    // API endpoint for user list
+    Route::get(
+      '/api/users',
+      [App\Http\Controllers\Admin\UserApiController::class, 'list']
+    )->name('admin.users.list');
   });
 
   // Team management routes (admin, hr)
@@ -68,6 +74,12 @@ Route::middleware(['auth', 'verified', 'company.context', 'role:admin,hr'])->pre
       // Handle team deletion
       return redirect()->route('admin.teams.index');
     })->name('admin.teams.destroy');
+
+    // API endpoint for team list
+    Route::get(
+      '/api/teams',
+      [App\Http\Controllers\Admin\TeamApiController::class, 'list']
+    )->name('admin.teams.list');
   });
 
   // Leave type management routes (admin, hr)
@@ -98,6 +110,9 @@ Route::middleware(['auth', 'verified', 'company.context', 'role:admin,hr'])->pre
       // Handle leave type deletion
       return redirect()->route('admin.leave-types.index');
     })->name('admin.leave-types.destroy');
+
+    // API endpoint for leave type list
+    Route::get('/api/leave-types', [App\Http\Controllers\Admin\LeaveTypeApiController::class, 'list'])->name('admin.leave-types.list');
   });
 
   // Company management routes (admin only)
@@ -113,9 +128,9 @@ Route::middleware(['auth', 'verified', 'company.context', 'role:admin,hr'])->pre
 
   // Reports routes (admin, hr)
   Route::middleware(['role:admin,hr'])->group(function () {
-    Route::get('/reports', function () {
-      return Inertia::render('admin/reports/Index');
-    })->name('admin.reports.index');
+    Route::get('/reports', [App\Http\Controllers\Admin\ReportController::class, 'index'])->name('admin.reports.index');
+    Route::post('/reports/generate', [App\Http\Controllers\Admin\ReportController::class, 'generate'])->name('admin.reports.generate');
+    Route::post('/reports/export', [App\Http\Controllers\Admin\ReportController::class, 'export'])->name('admin.reports.export');
   });
 
   // Analytics routes (admin only)
