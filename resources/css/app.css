@@ -185,3 +185,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+html body { overflow: auto !important; padding-right: 0 !important; }
+
+input, button[role=combobox], button[aria-haspopup=dialog], button[aria-haspopup=menu] {
+  @apply !h-12;
+}
+
+.is-large {
+  @apply !h-12;
+}
+
+.is-x-large {
+  @apply !h-14;
+}

@@ -30,7 +30,8 @@ class LeaveType extends Model
     'requires_approval',
     'approvers',
     'requires_documentation',
-    'documentation_type'
+    'documentation_type',
+    'company_id'
   ];
 
   protected $casts = [
@@ -62,6 +63,18 @@ class LeaveType extends Model
   public function forGender(Builder $query, ?string $gender)
   {
     return $query->where('gender', $gender)->orWhereNull('gender');
+  }
+
+  // Leave type belongs to a company
+  public function company()
+  {
+    return $this->belongsTo(Company::class);
+  }
+
+  // Scope to filter leave types by company
+  public function scopeForCompany($query, $companyId)
+  {
+    return $query->where('company_id', $companyId);
   }
 
   // Check if leave type requires documentation

@@ -23,7 +23,7 @@ class User extends Authenticatable
    *
    * @var list<string>
    */
-  protected $fillable = ['name', 'email', 'password', 'team_id'];
+  protected $fillable = ['name', 'email', 'password', 'team_id', 'company_id'];
 
   /**
    * The attributes that should be hidden for serialization.
@@ -70,5 +70,17 @@ class User extends Authenticatable
   public function managedTeam(): HasOne
   {
     return $this->hasOne(Team::class, 'manager_id');
+  }
+
+  // User belongs to a company
+  public function company(): BelongsTo
+  {
+    return $this->belongsTo(Company::class);
+  }
+
+  // Scope to filter users by company
+  public function scopeForCompany($query, $companyId)
+  {
+    return $query->where('company_id', $companyId);
   }
 }

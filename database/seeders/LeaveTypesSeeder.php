@@ -3,70 +3,175 @@
 namespace Database\Seeders;
 
 use App\Models\LeaveType;
+use App\Models\Company;
 use Illuminate\Database\Seeder;
 
 class LeaveTypesSeeder extends Seeder
 {
   public function run()
   {
-    // Annual Leave (Malawi minimum: 15 days for 5-day week)
-    LeaveType::create([
-      'name' => 'Annual Leave',
-      'description' => 'Paid time off for rest and relaxation',
-      'days_allowed' => 15,
-      'min_duration' => 1,
-      'max_duration' => 15,
-      'gender' => null,
-      'cooldown_days' => 0,
-      'requires_approval' => true,
-      'approvers' => ['manager'],
-    ]);
+    $companies = Company::all();
 
-    // Maternity Leave (Malawi: 8 weeks)
-    LeaveType::create([
-      'name' => 'Maternity Leave',
-      'description' => '8 weeks paid leave for expecting mothers (Malawi Employment Act)',
-      'days_allowed' => 40,
-      'min_duration' => 40, // Must take full duration
-      'max_duration' => 40,
-      'gender' => 'female',
-      'cooldown_days' => 1095, // 3 years
-      'requires_documentation' => true,
-      'documentation_type' => 'pregnancy_confirmation',
-      'approvers' => ['hr'],
-    ]);
+    foreach ($companies as $company) {
+      // Create leave types for each company
+      $leaveTypes = [
+        [
+          'name' => 'Annual Leave',
+          'description' => 'Yearly vacation leave for rest and relaxation',
+          'days_allowed' => 21,
+          'min_duration' => 1,
+          'max_duration' => 21,
+          'allow_custom_duration' => true,
+          'gender' => null,
+          'min_employment_months' => 6,
+          'cooldown_days' => 0,
+          'max_usage_per_year' => 1,
+          'full_pay_days' => 21,
+          'half_pay_days' => 0,
+          'requires_approval' => true,
+          'approvers' => ['manager', 'hr'],
+          'requires_documentation' => false,
+          'company_id' => $company->id,
+        ],
+        [
+          'name' => 'Sick Leave',
+          'description' => 'Medical leave for illness or injury',
+          'days_allowed' => 10,
+          'min_duration' => 1,
+          'max_duration' => 10,
+          'allow_custom_duration' => true,
+          'gender' => null,
+          'min_employment_months' => 0,
+          'cooldown_days' => 0,
+          'max_usage_per_year' => 3,
+          'full_pay_days' => 10,
+          'half_pay_days' => 0,
+          'requires_approval' => false,
+          'approvers' => null,
+          'requires_documentation' => true,
+          'documentation_type' => 'medical_certificate',
+          'company_id' => $company->id,
+        ],
+        [
+          'name' => 'Maternity Leave',
+          'description' => 'Leave for new mothers',
+          'days_allowed' => 90,
+          'min_duration' => 30,
+          'max_duration' => 90,
+          'allow_custom_duration' => false,
+          'gender' => 'female',
+          'min_employment_months' => 12,
+          'cooldown_days' => 1095, // 3 years
+          'max_usage_per_year' => 1,
+          'full_pay_days' => 60,
+          'half_pay_days' => 30,
+          'requires_approval' => true,
+          'approvers' => ['hr'],
+          'requires_documentation' => true,
+          'documentation_type' => 'medical_certificate',
+          'company_id' => $company->id,
+        ],
+        [
+          'name' => 'Paternity Leave',
+          'description' => 'Leave for new fathers',
+          'days_allowed' => 14,
+          'min_duration' => 7,
+          'max_duration' => 14,
+          'allow_custom_duration' => false,
+          'gender' => 'male',
+          'min_employment_months' => 12,
+          'cooldown_days' => 1095, // 3 years
+          'max_usage_per_year' => 1,
+          'full_pay_days' => 14,
+          'half_pay_days' => 0,
+          'requires_approval' => true,
+          'approvers' => ['manager', 'hr'],
+          'requires_documentation' => true,
+          'documentation_type' => 'birth_certificate',
+          'company_id' => $company->id,
+        ],
+        [
+          'name' => 'Personal Leave',
+          'description' => 'Personal time off for personal matters',
+          'days_allowed' => 5,
+          'min_duration' => 1,
+          'max_duration' => 5,
+          'allow_custom_duration' => true,
+          'gender' => null,
+          'min_employment_months' => 3,
+          'cooldown_days' => 30,
+          'max_usage_per_year' => 2,
+          'full_pay_days' => 0,
+          'half_pay_days' => 0,
+          'requires_approval' => true,
+          'approvers' => ['manager'],
+          'requires_documentation' => false,
+          'company_id' => $company->id,
+        ],
+        [
+          'name' => 'Emergency Leave',
+          'description' => 'Urgent leave for family emergencies',
+          'days_allowed' => 3,
+          'min_duration' => 1,
+          'max_duration' => 3,
+          'allow_custom_duration' => true,
+          'gender' => null,
+          'min_employment_months' => 0,
+          'cooldown_days' => 90,
+          'max_usage_per_year' => 3,
+          'full_pay_days' => 3,
+          'half_pay_days' => 0,
+          'requires_approval' => false,
+          'approvers' => null,
+          'requires_documentation' => true,
+          'documentation_type' => 'emergency_proof',
+          'company_id' => $company->id,
+        ],
+        [
+          'name' => 'Study Leave',
+          'description' => 'Leave for educational purposes and professional development',
+          'days_allowed' => 10,
+          'min_duration' => 1,
+          'max_duration' => 10,
+          'allow_custom_duration' => true,
+          'gender' => null,
+          'min_employment_months' => 24,
+          'cooldown_days' => 365,
+          'max_usage_per_year' => 1,
+          'full_pay_days' => 5,
+          'half_pay_days' => 5,
+          'requires_approval' => true,
+          'approvers' => ['manager', 'hr'],
+          'requires_documentation' => true,
+          'documentation_type' => 'enrollment_certificate',
+          'company_id' => $company->id,
+        ],
+        [
+          'name' => 'Bereavement Leave',
+          'description' => 'Leave for mourning the loss of a family member',
+          'days_allowed' => 5,
+          'min_duration' => 1,
+          'max_duration' => 5,
+          'allow_custom_duration' => true,
+          'gender' => null,
+          'min_employment_months' => 0,
+          'cooldown_days' => 0,
+          'max_usage_per_year' => 3,
+          'full_pay_days' => 5,
+          'half_pay_days' => 0,
+          'requires_approval' => false,
+          'approvers' => null,
+          'requires_documentation' => true,
+          'documentation_type' => 'death_certificate',
+          'company_id' => $company->id,
+        ],
+      ];
 
-    // Paternity Leave (Malawi: 2 weeks)
-    LeaveType::create([
-      'name' => 'Paternity Leave',
-      'description' => '2 weeks paid leave for new fathers (Malawi Employment Act)',
-      'days_allowed' => 10,
-      'min_duration' => 5,  // Can take minimum 1 week
-      'max_duration' => 10,
-      'gender' => 'male',
-      'cooldown_days' => 1095, // 3 years
-      'approvers' => ['manager'],
-    ]);
+      foreach ($leaveTypes as $leaveTypeData) {
+        LeaveType::create($leaveTypeData);
+      }
+    }
 
-    // Sick Leave (Malawi: 4w full pay + 8w half pay)
-    LeaveType::create([
-      'name' => 'Sick Leave',
-      'description' => '4 weeks full pay + 8 weeks half pay annually',
-      'days_allowed' => 60, // 12 weeks total
-      'full_pay_days' => 20, // 4 weeks
-      'half_pay_days' => 40, // 8 weeks
-      'requires_documentation' => true,
-      'documentation_type' => 'medical_certificate',
-      'approvers' => ['hr', 'manager'],
-    ]);
-
-    // Unpaid Leave
-    LeaveType::create([
-      'name' => 'Unpaid Leave',
-      'description' => 'Leave without pay',
-      'days_allowed' => 365, // Theoretical max
-      'requires_approval' => true,
-      'approvers' => ['hr'],
-    ]);
+    $this->command->info('Leave types created for all companies successfully!');
   }
 }
