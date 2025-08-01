@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use App\Services\LeaveTypeService;
 
 class LeaveRequest extends Model
 {
@@ -25,15 +26,7 @@ class LeaveRequest extends Model
   // Get the display name for the leave type
   public function getTypeDisplayName(): string
   {
-    $types = [
-      'annual' => 'Annual Leave',
-      'sick' => 'Sick Leave', 
-      'personal' => 'Personal Leave',
-      'emergency' => 'Emergency Leave',
-      'unpaid' => 'Unpaid Leave',
-    ];
-
-    return $types[$this->type] ?? ucfirst($this->type) . ' Leave';
+    return LeaveTypeService::getDisplayName($this->type);
   }
 
   // Employee who requested the leave

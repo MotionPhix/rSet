@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Employee;
 use App\Http\Controllers\Controller;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\LeaveTypeService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -221,15 +222,6 @@ class CalendarController extends Controller
     
     private function getLeaveTypes()
     {
-        return [
-            'Annual Leave',
-            'Sick Leave',
-            'Personal Leave',
-            'Maternity Leave',
-            'Paternity Leave',
-            'Emergency Leave',
-            'Study Leave',
-            'Unpaid Leave',
-        ];
+        return LeaveTypeService::getSelectOptions();
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Services\LeaveTypeService;
 
 class LeaveRequestResource extends JsonResource
 {
@@ -46,14 +47,6 @@ class LeaveRequestResource extends JsonResource
      */
     private function getTypeDisplayName(): string
     {
-        $types = [
-            'annual' => 'Annual Leave',
-            'sick' => 'Sick Leave',
-            'personal' => 'Personal Leave',
-            'emergency' => 'Emergency Leave',
-            'unpaid' => 'Unpaid Leave',
-        ];
-
-        return $types[$this->type] ?? ucfirst($this->type) . ' Leave';
+        return LeaveTypeService::getDisplayName($this->type);
     }
 }

@@ -71,7 +71,10 @@ interface Props {
     };
   }>;
   teamData: Array<any>;
-  leaveTypes: string[];
+  leaveTypes: Array<{
+    value: string;
+    label: string;
+  }>;
   userPermissions: {
     canViewTeam: boolean;
     canCreateLeave: boolean;
@@ -530,10 +533,10 @@ onMounted(() => {
                     <SelectContent>
                       <SelectItem
                         v-for="type in props.leaveTypes"
-                        :key="type"
-                        :value="type"
+                        :key="type.value"
+                        :value="type.value"
                       >
-                        {{ type }}
+                        {{ type.label }}
                       </SelectItem>
                     </SelectContent>
                   </Select>
