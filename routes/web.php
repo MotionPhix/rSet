@@ -22,8 +22,14 @@ Route::get('/test-roles', function () {
   ]);
 })->middleware('auth');
 
+// Test super-admin route directly
+Route::get('/direct-super-admin-test', function () {
+  return 'Direct super admin test works!';
+})->name('direct.super-admin.test');
+
 require __DIR__ . '/admin.php';
 require __DIR__ . '/employee.php';
 require __DIR__ . '/settings.php';
+require __DIR__ . '/super-admin.php';
 require __DIR__ . '/company.php';
 require __DIR__ . '/auth.php';

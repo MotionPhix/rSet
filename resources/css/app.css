@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 
 @import "tw-animate-css";
+@import "./theme.css";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -188,7 +189,9 @@
 
 html body { overflow: auto !important; padding-right: 0 !important; }
 
-input, button[role=combobox], button[aria-haspopup=dialog], button[aria-haspopup=menu] {
+input, [role=combobox].is-large, 
+button[aria-haspopup=dialog].is-large, 
+button[aria-haspopup=menu].is-large {
   @apply !h-12;
 }
 

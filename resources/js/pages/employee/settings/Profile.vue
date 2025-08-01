@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
+import { computed, ref, onUnmounted } from 'vue';
 import { toast } from 'vue-sonner';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
@@ -19,7 +19,6 @@ import {
   Building2,
   Users,
   Shield,
-  Upload,
   Camera
 } from 'lucide-vue-next';
 import { type SharedData, type User as UserType } from '@/types';
@@ -32,19 +31,25 @@ interface Props {
 defineProps<Props>();
 
 const page = usePage<SharedData>();
-const user = computed(() => page.props.auth.user as UserType);
-const company = computed(() => page.props.auth.company);
+const user = computed(() => page.props.user as UserType);
+const company = computed(() => page.props.company);
+const avatarInput = ref<HTMLInputElement>();
+const avatarPreview = ref<string | null>(null);
+const isDragOver = ref(false);
 
 const form = useForm({
   name: user.value.name,
   email: user.value.email,
+  avatar: null as File | null,
 });
 
 const submit = () => {
-  form.patch(route('employee.settings.profile.update'), {
+  // Use POST with _method: PATCH for file uploads (Inertia.js standard)
+  form.post(route('settings.profile.update'), {
     preserveScroll: true,
     onSuccess: () => {
       toast.success('Profile updated successfully');
+      form.avatar = null;
     },
     onError: () => {
       toast.error('Failed to update profile');
@@ -52,19 +57,118 @@ const submit = () => {
   });
 };
 
+const handleAvatarFile = (file: File) => {
+  // Validate file size (2MB max)
+  if (file.size > 2 * 1024 * 1024) {
+    toast.error('File size must be less than 2MB');
+    return;
+  }
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    toast.error('Please select an image file');
+    return;
+  }
+
+  // Clear any existing preview
+  if (avatarPreview.value) {
+    URL.revokeObjectURL(avatarPreview.value);
+  }
+  
+  // Create preview URL
+  avatarPreview.value = URL.createObjectURL(file);
+  
+  form.avatar = file;
+  form.post(route('settings.profile.update'), {
+    preserveScroll: true,
+    onSuccess: () => {
+      toast.success('Avatar updated successfully');
+      form.reset('avatar');
+      // Clear preview since we should now have a server URL
+      if (avatarPreview.value) {
+        URL.revokeObjectURL(avatarPreview.value);
+        avatarPreview.value = null;
+      }
+    },
+    onError: () => {
+      toast.error('Failed to update avatar');
+      // Clear preview on error
+      if (avatarPreview.value) {
+        URL.revokeObjectURL(avatarPreview.value);
+        avatarPreview.value = null;
+      }
+    },
+  });
+};
+
+const handleAvatarChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    handleAvatarFile(file);
+  }
+};
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault();
+  isDragOver.value = true;
+};
+
+const handleDragLeave = (event: DragEvent) => {
+  event.preventDefault();
+  isDragOver.value = false;
+};
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault();
+  isDragOver.value = false;
+  
+  const file = event.dataTransfer?.files?.[0];
+  if (file) {
+    handleAvatarFile(file);
+  }
+};
+
+// Clean up object URLs when component unmounts
+onUnmounted(() => {
+  if (avatarPreview.value) {
+    URL.revokeObjectURL(avatarPreview.value);
+  }
+});
+
+const removeAvatar = () => {
+  if (confirm('Are you sure you want to remove your avatar?')) {
+    // Clear any preview
+    if (avatarPreview.value) {
+      URL.revokeObjectURL(avatarPreview.value);
+      avatarPreview.value = null;
+    }
+    
+    router.delete(route('settings.profile.avatar.remove'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.success('Avatar removed successfully');
+      },
+      onError: () => {
+        toast.error('Failed to remove avatar');
+      },
+    });
+  }
+};
+
 const getInitials = (name: string) => {
   return name.split(' ').map(n => n[0]).join('').toUpperCase();
 };
 
 const getRoleBadge = (roles: any[]) => {
-  if (!roles || roles.length === 0) return { variant: 'outline', label: 'Employee' };
+  if (!roles || roles.length === 0) return { variant: 'outline' as const, label: 'Employee' };
 
   const role = roles[0].name;
   switch (role) {
-    case 'admin': return { variant: 'default', label: 'Administrator' };
-    case 'hr': return { variant: 'secondary', label: 'HR Manager' };
-    case 'manager': return { variant: 'outline', label: 'Team Manager' };
-    default: return { variant: 'outline', label: 'Employee' };
+    case 'admin': return { variant: 'default' as const, label: 'Administrator' };
+    case 'hr': return { variant: 'secondary' as const, label: 'HR Manager' };
+    case 'manager': return { variant: 'outline' as const, label: 'Team Manager' };
+    default: return { variant: 'outline' as const, label: 'Employee' };
   }
 };
 
@@ -102,19 +206,71 @@ const formatDate = (dateString: string) => {
         <CardContent class="space-y-6">
           <!-- Profile Summary -->
           <div class="flex items-start space-x-4">
-            <div class="relative">
-              <Avatar class="h-20 w-20">
-                <AvatarImage :src="user.avatar" />
+            <div 
+              class="relative cursor-pointer group"
+              @dragover="handleDragOver"
+              @dragleave="handleDragLeave"
+              @drop="handleDrop"
+              @click="avatarInput?.click()"
+            >
+              <Avatar 
+                class="h-20 w-20 transition-all duration-200"
+                :class="[
+                  isDragOver ? 'scale-105 ring-2 ring-primary ring-offset-2' : '',
+                  form.processing ? 'opacity-75' : ''
+                ]"
+              >
+                <AvatarImage 
+                  v-if="avatarPreview || (user as any).avatar" 
+                  :src="avatarPreview || (user as any).avatar" 
+                />
                 <AvatarFallback class="text-lg">{{ getInitials(user.name) }}</AvatarFallback>
               </Avatar>
-              <Button
-                size="sm"
-                variant="outline"
-                class="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+              
+              <!-- Drag overlay -->
+              <div 
+                v-if="isDragOver" 
+                class="absolute inset-0 bg-primary/20 rounded-full flex items-center justify-center border-2 border-dashed border-primary"
               >
-                <Camera class="h-4 w-4" />
-                <span class="sr-only">Change avatar</span>
-              </Button>
+                <span class="text-xs text-primary font-medium">Drop here</span>
+              </div>
+              
+              <!-- Loading overlay -->
+              <div v-if="form.processing" class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                <div class="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+              </div>
+              
+              <div class="absolute -bottom-2 -right-2 flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  class="h-8 w-8 rounded-full p-0"
+                  :disabled="form.processing"
+                  @click.stop="avatarInput?.click()"
+                >
+                  <Camera class="h-4 w-4" />
+                  <span class="sr-only">Change avatar</span>
+                </Button>
+                <Button
+                  v-if="avatarPreview || (user as any).avatar"
+                  size="sm"
+                  variant="outline" 
+                  class="h-8 w-8 rounded-full p-0"
+                  :disabled="form.processing"
+                  @click.stop="removeAvatar"
+                >
+                  <span class="text-xs">×</span>
+                  <span class="sr-only">Remove avatar</span>
+                </Button>
+              </div>
+              <input
+                ref="avatarInput"
+                type="file"
+                accept="image/jpeg,image/png,image/gif"
+                class="hidden"
+                :disabled="form.processing"
+                @change="handleAvatarChange"
+              />
             </div>
             <div class="space-y-2 flex-1">
               <div>
@@ -152,13 +308,13 @@ const formatDate = (dateString: string) => {
               <div class="text-sm text-muted-foreground">Joined</div>
               <div class="flex items-center gap-2">
                 <Calendar class="h-4 w-4 text-muted-foreground" />
-                <span>{{ formatDate(user.created_at) }}</span>
+                <span>{{ formatDate((user as any).created_at || new Date().toISOString()) }}</span>
               </div>
             </div>
             <div class="space-y-2">
               <div class="text-sm text-muted-foreground">Email Status</div>
-              <Badge :variant="user.email_verified_at ? 'default' : 'destructive'">
-                {{ user.email_verified_at ? 'Verified' : 'Unverified' }}
+              <Badge :variant="(user as any).email_verified_at ? 'default' : 'destructive'">
+                {{ (user as any).email_verified_at ? 'Verified' : 'Unverified' }}
               </Badge>
             </div>
           </div>
@@ -210,7 +366,7 @@ const formatDate = (dateString: string) => {
             </div>
 
             <!-- Email Verification Notice -->
-            <div v-if="mustVerifyEmail && user.email_verified_at === null" class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
+            <div v-if="mustVerifyEmail && (user as any).email_verified_at === null" class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
               <div class="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                 <Mail class="h-4 w-4" />
                 <div class="text-sm">
@@ -272,7 +428,7 @@ const formatDate = (dateString: string) => {
                 </div>
               </div>
               <Button variant="outline" as-child>
-                <Link :href="route('employee.settings.password')">
+                <Link :href="route('settings.password')">
                   Change Password
                 </Link>
               </Button>
@@ -286,7 +442,7 @@ const formatDate = (dateString: string) => {
                 </div>
               </div>
               <Button variant="outline" as-child>
-                <Link :href="route('employee.settings.appearance')">
+                <Link :href="route('settings.appearance')">
                   Customize
                 </Link>
               </Button>

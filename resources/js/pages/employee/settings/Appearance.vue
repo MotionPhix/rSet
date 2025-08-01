@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import { ref, computed, onMounted } from 'vue';
-import { useDark, useToggle } from '@vueuse/core';
 import { toast } from 'vue-sonner';
+import { useTheme } from '@/composables/useTheme';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import { Button } from '@/components/ui/button';
@@ -10,29 +10,58 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import {
   Palette,
   Sun,
   Moon,
   Monitor,
-  Zap,
-  Globe,
   Eye,
   Accessibility
 } from 'lucide-vue-next';
 
-const isDark = useDark();
-const toggleDark = useToggle(isDark);
+// Use the global theme composable
+const {
+  themeSettings,
+  updateThemeMode,
+  updateAccentColor,
+  updateFontSize,
+  updateSidebarCollapsed,
+  updateReducedMotion,
+  updateHighContrast,
+  resetToDefaults: resetThemeToDefaults,
+} = useTheme();
 
-// Theme settings
-const themeMode = ref(localStorage.getItem('theme-mode') || 'system');
-const accentColor = ref(localStorage.getItem('accent-color') || 'blue');
-const fontSize = ref(localStorage.getItem('font-size') || 'medium');
-const sidebarCollapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true');
-const reducedMotion = ref(localStorage.getItem('reduced-motion') === 'true');
-const highContrast = ref(localStorage.getItem('high-contrast') === 'true');
+// Local reactive references for form handling
+const themeMode = computed({
+  get: () => themeSettings.value.mode,
+  set: (value) => updateThemeMode(value)
+});
+
+const accentColor = computed({
+  get: () => themeSettings.value.accentColor,
+  set: (value) => updateAccentColor(value)
+});
+
+const fontSize = computed({
+  get: () => themeSettings.value.fontSize,
+  set: (value) => updateFontSize(value)
+});
+
+const sidebarCollapsed = computed({
+  get: () => themeSettings.value.sidebarCollapsed,
+  set: (value) => updateSidebarCollapsed(value)
+});
+
+const reducedMotion = computed({
+  get: () => themeSettings.value.reducedMotion,
+  set: (value) => updateReducedMotion(value)
+});
+
+const highContrast = computed({
+  get: () => themeSettings.value.highContrast,
+  set: (value) => updateHighContrast(value)
+});
 
 // Theme options
 const themeOptions = [
@@ -56,85 +85,20 @@ const fontSizes = [
   { value: 'large', label: 'Large', description: 'Larger text for better readability' }
 ];
 
-// Apply theme changes
-const applyTheme = () => {
-  // Apply theme mode
-  if (themeMode.value === 'dark') {
-    document.documentElement.classList.add('dark');
-  } else if (themeMode.value === 'light') {
-    document.documentElement.classList.remove('dark');
-  } else {
-    // System preference
-    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (systemDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }
-
-  // Apply accent color
-  document.documentElement.setAttribute('data-accent-color', accentColor.value);
-
-  // Apply font size
-  document.documentElement.setAttribute('data-font-size', fontSize.value);
-
-  // Apply accessibility settings
-  if (reducedMotion.value) {
-    document.documentElement.style.setProperty('--motion-reduce', 'true');
-  } else {
-    document.documentElement.style.removeProperty('--motion-reduce');
-  }
-
-  if (highContrast.value) {
-    document.documentElement.classList.add('high-contrast');
-  } else {
-    document.documentElement.classList.remove('high-contrast');
-  }
-};
-
-// Save preferences
+// Actions
 const savePreferences = () => {
-  localStorage.setItem('theme-mode', themeMode.value);
-  localStorage.setItem('accent-color', accentColor.value);
-  localStorage.setItem('font-size', fontSize.value);
-  localStorage.setItem('sidebar-collapsed', sidebarCollapsed.value.toString());
-  localStorage.setItem('reduced-motion', reducedMotion.value.toString());
-  localStorage.setItem('high-contrast', highContrast.value.toString());
-
-  applyTheme();
+  // Settings are automatically saved via the composable
   toast.success('Appearance settings saved');
 };
 
-// Reset to defaults
 const resetToDefaults = () => {
-  themeMode.value = 'system';
-  accentColor.value = 'blue';
-  fontSize.value = 'medium';
-  sidebarCollapsed.value = false;
-  reducedMotion.value = false;
-  highContrast.value = false;
-
-  savePreferences();
+  resetThemeToDefaults();
   toast.success('Settings reset to defaults');
 };
-
-// Initialize theme on mount
-onMounted(() => {
-  applyTheme();
-});
-
-// Watch for system theme changes
-if (typeof window !== 'undefined') {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (themeMode.value === 'system') {
-      applyTheme();
-    }
-  });
-}
 </script>
 
 <template>
+
   <Head title="Appearance Settings" />
 
   <SettingsLayout>
@@ -188,26 +152,22 @@ if (typeof window !== 'undefined') {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div class="grid gap-3 md:grid-cols-6">
+          <RadioGroup v-model="accentColor" class="grid gap-3 md:grid-cols-3">
             <div
               v-for="color in accentColors"
               :key="color.value"
               class="flex items-center space-x-2"
             >
-              <RadioGroup v-model="accentColor">
-                <div class="flex items-center space-x-2">
-                  <RadioGroupItem :value="color.value" :id="color.value" />
-                  <Label
-                    :for="color.value"
-                    class="flex items-center gap-2 cursor-pointer"
-                  >
-                    <div class="w-4 h-4 rounded-full" :class="color.color"></div>
-                    <span class="text-sm">{{ color.label }}</span>
-                  </Label>
-                </div>
-              </RadioGroup>
+              <RadioGroupItem :value="color.value" :id="`accent-${color.value}`" />
+              <Label
+                :for="`accent-${color.value}`"
+                class="flex items-center gap-2 cursor-pointer flex-1 p-3 rounded-lg border hover:bg-accent transition-colors"
+              >
+                <div class="w-4 h-4 rounded-full" :class="color.color"></div>
+                <span class="text-sm">{{ color.label }}</span>
+              </Label>
             </div>
-          </div>
+          </RadioGroup>
         </CardContent>
       </Card>
 
@@ -344,6 +304,7 @@ if (typeof window !== 'undefined') {
       </div>
     </div>
   </SettingsLayout>
+  
 </template>
 
 <style scoped>

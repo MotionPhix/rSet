@@ -5,7 +5,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
-import { initializeTheme } from './composables/useAppearance';
+import { useTheme } from './composables/useTheme';
 import VueApexCharts from 'vue3-apexcharts';
 
 // Extend ImportMeta interface for Vite...
@@ -39,5 +39,6 @@ createInertiaApp({
   }
 });
 
-// This will set light / dark mode on page load...
-initializeTheme();
+// Initialize theme system on page load
+const { applyThemeSettings } = useTheme();
+applyThemeSettings();

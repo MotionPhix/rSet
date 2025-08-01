@@ -2,40 +2,65 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, usePage } from '@inertiajs/vue3';
-import { computed, onMounted } from 'vue';
+import { computed, ref } from 'vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarIcon, UsersIcon, FileCheckIcon, TrendingUpIcon } from 'lucide-vue-next';
-import ApexCharts from 'apexcharts';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { CalendarDaysIcon, ClockIcon, CheckCircleIcon, XCircleIcon, UsersIcon } from 'lucide-vue-next';
+import ApexChart from 'vue3-apexcharts';
 
 interface Props {
   stats: {
-    totalEmployees: number;
-    pendingRequests: number;
-    approvedThisMonth: number;
-    leaveTypes: number;
-    myLeaveBalance: {
-      total: number;
-      used: number;
-      remaining: number;
-    };
-    recentActivity: Array<{
-      id: number;
-      user_name: string;
-      action: string;
-      time: string;
-      status: string;
-    }>;
-    leavesByMonth: Array<{
-      month: string;
-      approved: number;
-      pending: number;
-      rejected: number;
-    }>;
-    leavesByType: Array<{
-      name: string;
-      count: number;
-      color: string;
-    }>;
+    total_requests: number;
+    pending_requests: number;
+    approved_requests: number;
+    rejected_requests: number;
+    days_taken: number;
+  };
+  recentRequests: Array<{
+    id: number;
+    leave_type: string;
+    start_date: string;
+    end_date: string;
+    days_requested: number;
+    status: string;
+    reason: string;
+    submitted_at: string;
+  }>;
+  leaveBalance: Array<{
+    type: string;
+    total_days: number;
+    used_days: number;
+    remaining_days: number;
+    percentage_used: number;
+  }>;
+  monthlyUsage: Array<{
+    month: string;
+    days: number;
+  }>;
+  requestsByStatus: Array<{
+    status: string;
+    count: number;
+  }>;
+  upcomingLeave: Array<{
+    id: number;
+    leave_type: string;
+    start_date: string;
+    end_date: string;
+    days_requested: number;
+    days_until: number;
+  }>;
+  teamOnLeave: Array<{
+    user_name: string;
+    leave_type: string;
+    start_date: string;
+    end_date: string;
+    days_requested: number;
+  }>;
+  user: {
+    name: string;
+    email: string;
+    team: string | null;
   };
 }
 
@@ -43,352 +68,294 @@ const props = defineProps<Props>();
 
 const page = usePage<SharedData>();
 
-// Get user info and company
-const user = computed(() => page.props.auth.user);
-const company = computed(() => page.props.auth.company);
-const userRoles = computed(() => user.value?.roles?.map(role => role.name) || []);
-const isAdmin = computed(() => userRoles.value.includes('admin'));
-const isHR = computed(() => userRoles.value.includes('hr'));
-const isManager = computed(() => userRoles.value.includes('manager'));
+// Chart configurations
+const monthlyUsageChartOptions = ref({
+  chart: {
+    type: 'line',
+    height: 350,
+    toolbar: { show: false }
+  },
+  stroke: {
+    curve: 'smooth',
+    width: 3
+  },
+  colors: ['#3B82F6'],
+  xaxis: {
+    categories: props.monthlyUsage.map(item => item.month)
+  },
+  yaxis: {
+    title: {
+      text: 'Days Taken'
+    }
+  },
+  grid: {
+    borderColor: '#e0e0e0'
+  },
+  tooltip: {
+    y: {
+      formatter: (value: number) => `${value} days`
+    }
+  }
+});
 
-// Role-aware breadcrumbs
-const breadcrumbs = computed((): BreadcrumbItem[] => [
+const monthlyUsageChartSeries = ref([
   {
-    title: 'Dashboard',
-    href: isAdmin.value ? route('admin.dashboard') : route('dashboard')
+    name: 'Days Taken',
+    data: props.monthlyUsage.map(item => item.days)
   }
 ]);
 
-// Welcome message based on role
-const welcomeMessage = computed(() => {
-  if (isAdmin.value) return `Welcome back, ${user.value?.name}! Here's your company overview.`;
-  if (isHR.value) return `Welcome back, ${user.value?.name}! Here's your HR dashboard.`;
-  if (isManager.value) return `Welcome back, ${user.value?.name}! Here's your team overview.`;
-  return `Welcome back, ${user.value?.name}! Here's your dashboard.`;
-});
-
-// Apex Charts Configuration
-const leaveBalanceChartOptions = computed(() => ({
+const statusChartOptions = ref({
   chart: {
     type: 'donut',
-    height: 280,
-    background: 'transparent'
+    height: 300
   },
-  colors: ['#10b981', '#f59e0b', '#ef4444'],
-  labels: ['Used', 'Remaining', 'Pending'],
-  series: [
-    props.stats.myLeaveBalance.used,
-    props.stats.myLeaveBalance.remaining,
-    props.stats.myLeaveBalance.total - props.stats.myLeaveBalance.used - props.stats.myLeaveBalance.remaining
-  ],
+  colors: ['#F59E0B', '#10B981', '#EF4444'],
+  labels: props.requestsByStatus.map(item => item.status),
   legend: {
     position: 'bottom'
-  },
-  responsive: [{
-    breakpoint: 480,
-    options: {
-      chart: {
-        width: 200
-      },
-      legend: {
-        position: 'bottom'
-      }
-    }
-  }],
-  tooltip: {
-    y: {
-      formatter: function(val: number) {
-        return val + ' days';
-      }
-    }
-  }
-}));
-
-const monthlyLeaveChartOptions = computed(() => ({
-  chart: {
-    type: 'column',
-    height: 350,
-    background: 'transparent'
-  },
-  colors: ['#10b981', '#f59e0b', '#ef4444'],
-  series: [{
-    name: 'Approved',
-    data: props.stats.leavesByMonth.map(item => item.approved)
-  }, {
-    name: 'Pending',
-    data: props.stats.leavesByMonth.map(item => item.pending)
-  }, {
-    name: 'Rejected',
-    data: props.stats.leavesByMonth.map(item => item.rejected)
-  }],
-  xaxis: {
-    categories: props.stats.leavesByMonth.map(item => item.month)
   },
   plotOptions: {
-    bar: {
-      horizontal: false,
-      columnWidth: '55%',
-      endingShape: 'rounded'
+    pie: {
+      donut: {
+        size: '65%'
+      }
     }
-  },
-  dataLabels: {
-    enabled: false
-  },
-  stroke: {
-    show: true,
-    width: 2,
-    colors: ['transparent']
-  },
-  fill: {
-    opacity: 1
   },
   tooltip: {
     y: {
-      formatter: function(val: number) {
-        return val + ' requests';
-      }
+      formatter: (value: number) => `${value} requests`
     }
-  }
-}));
-
-const leaveTypeChartOptions = computed(() => ({
-  chart: {
-    type: 'pie',
-    height: 300,
-    background: 'transparent'
-  },
-  colors: props.stats.leavesByType.map(item => item.color),
-  labels: props.stats.leavesByType.map(item => item.name),
-  series: props.stats.leavesByType.map(item => item.count),
-  legend: {
-    position: 'bottom'
-  },
-  responsive: [{
-    breakpoint: 480,
-    options: {
-      chart: {
-        width: 200
-      },
-      legend: {
-        position: 'bottom'
-      }
-    }
-  }]
-}));
-
-// Initialize charts on component mount
-onMounted(() => {
-  // Only render charts if we have data
-  if (props.stats) {
-    const leaveBalanceChart = new ApexCharts(
-      document.querySelector('#leave-balance-chart'),
-      leaveBalanceChartOptions.value
-    );
-    leaveBalanceChart.render();
-
-    const monthlyLeaveChart = new ApexCharts(
-      document.querySelector('#monthly-leave-chart'),
-      monthlyLeaveChartOptions.value
-    );
-    monthlyLeaveChart.render();
-
-    const leaveTypeChart = new ApexCharts(
-      document.querySelector('#leave-type-chart'),
-      leaveTypeChartOptions.value
-    );
-    leaveTypeChart.render();
   }
 });
+
+const statusChartSeries = ref(props.requestsByStatus.map(item => item.count));
+
+// Helper functions
+const getStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case 'approved': return 'default';
+    case 'pending': return 'secondary';
+    case 'rejected': return 'destructive';
+    default: return 'outline';
+  }
+};
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'approved': return CheckCircleIcon;
+    case 'pending': return ClockIcon;
+    case 'rejected': return XCircleIcon;
+    default: return ClockIcon;
+  }
+};
 </script>
 
 <template>
-  <Head title="Dashboard" />
+  <Head title="Employee Dashboard" />
 
-  <AppLayout :breadcrumbs="breadcrumbs">
-    <div class="flex h-full flex-1 flex-col gap-6 rounded-xl p-6">
+  <AppLayout :breadcrumbs="[
+      { title: 'Dashboard', href: route('dashboard') }
+    ]">
+
+    <div class="space-y-6 p-6 max-w-4xl">
       <!-- Welcome Section -->
-      <div class="space-y-2">
-        <h1 class="text-3xl font-bold tracking-tight">
-          {{ company?.name || 'Dashboard' }}
-        </h1>
-        <p class="text-muted-foreground">
-          {{ welcomeMessage }}
-        </p>
+      <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
+        <h1 class="text-2xl font-bold mb-2">Welcome back, {{ props.user.name }}!</h1>
+        <p class="text-blue-100">Here's your leave overview for this year.</p>
+        <div class="mt-4 text-sm">
+          <span v-if="props.user.team" class="bg-blue-500/30 px-2 py-1 rounded">{{ props.user.team }} Team</span>
+        </div>
       </div>
 
-      <!-- Stats Cards -->
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <!-- Total Employees (Admin/HR only) -->
-        <Card v-if="isAdmin || isHR">
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Total Employees</CardTitle>
-            <UsersIcon class="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold">{{ props.stats?.totalEmployees || 0 }}</div>
-            <p class="text-xs text-muted-foreground">
-              +2 from last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <!-- Pending Requests -->
+      <!-- Quick Stats -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">
-              {{ isAdmin || isHR || isManager ? 'Pending Requests' : 'My Requests' }}
-            </CardTitle>
-            <CalendarIcon class="h-4 w-4 text-muted-foreground" />
+            <CardTitle class="text-sm font-medium">Total Requests</CardTitle>
+            <CalendarDaysIcon class="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div class="text-2xl font-bold">{{ props.stats?.pendingRequests || 0 }}</div>
-            <p class="text-xs text-muted-foreground">
-              {{ isAdmin || isHR || isManager ? 'Awaiting approval' : 'Pending approval' }}
-            </p>
+            <div class="text-2xl font-bold">{{ props.stats.total_requests }}</div>
+            <p class="text-xs text-muted-foreground">All time requests</p>
           </CardContent>
         </Card>
 
-        <!-- Approved This Month -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Approved This Month</CardTitle>
-            <TrendingUpIcon class="h-4 w-4 text-muted-foreground" />
+            <CardTitle class="text-sm font-medium">Pending</CardTitle>
+            <ClockIcon class="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div class="text-2xl font-bold">{{ props.stats?.approvedThisMonth || 0 }}</div>
-            <p class="text-xs text-muted-foreground">
-              +12% from last month
-            </p>
+            <div class="text-2xl font-bold text-yellow-600">{{ props.stats.pending_requests }}</div>
+            <p class="text-xs text-muted-foreground">Awaiting approval</p>
           </CardContent>
         </Card>
 
-        <!-- Leave Types (Admin/HR only) -->
-        <Card v-if="isAdmin || isHR">
+        <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Leave Types</CardTitle>
-            <FileCheckIcon class="h-4 w-4 text-muted-foreground" />
+            <CardTitle class="text-sm font-medium">Approved</CardTitle>
+            <CheckCircleIcon class="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div class="text-2xl font-bold">{{ props.stats?.leaveTypes || 0 }}</div>
-            <p class="text-xs text-muted-foreground">
-              Active leave types
-            </p>
+            <div class="text-2xl font-bold text-green-600">{{ props.stats.approved_requests }}</div>
+            <p class="text-xs text-muted-foreground">Successfully approved</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Days Taken</CardTitle>
+            <CalendarDaysIcon class="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold text-blue-600">{{ props.stats.days_taken }}</div>
+            <p class="text-xs text-muted-foreground">This year</p>
           </CardContent>
         </Card>
       </div>
 
-      <!-- Quick Actions -->
-      <div class="grid gap-4 md:grid-cols-2">
-        <!-- Recent Activity -->
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Monthly Usage Chart -->
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest leave requests and updates</CardDescription>
+            <CardTitle>Monthly Leave Usage</CardTitle>
+            <CardDescription>Your leave usage over the past 12 months</CardDescription>
           </CardHeader>
           <CardContent>
-            <div class="space-y-4" v-if="props.stats?.recentActivity?.length">
-              <div class="flex items-center space-x-4" v-for="activity in props.stats.recentActivity"
-                   :key="activity.id">
-                <div class="w-2 h-2 rounded-full" :class="{
-                                    'bg-green-500': activity.status === 'approved',
-                                    'bg-yellow-500': activity.status === 'pending',
-                                    'bg-red-500': activity.status === 'rejected'
-                                }"></div>
-                <div class="flex-1 space-y-1">
-                  <p class="text-sm font-medium">
-                    {{ activity.user_name }}'s {{ activity.action }}
+            <ApexChart
+              type="line"
+              height="300"
+              :options="monthlyUsageChartOptions"
+              :series="monthlyUsageChartSeries"
+            />
+          </CardContent>
+        </Card>
+
+        <!-- Status Distribution Chart -->
+        <Card>
+          <CardHeader>
+            <CardTitle>Request Status Distribution</CardTitle>
+            <CardDescription>Breakdown of your leave requests by status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ApexChart
+              type="donut"
+              height="300"
+              :options="statusChartOptions"
+              :series="statusChartSeries"
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <!-- Leave Balance -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Leave Balance</CardTitle>
+          <CardDescription>Your remaining leave balance by type</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div v-for="balance in props.leaveBalance" :key="balance.type" class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-sm font-medium">{{ balance.type }}</span>
+                <span class="text-sm text-muted-foreground">
+                  {{ balance.remaining_days }}/{{ balance.total_days }} days
+                </span>
+              </div>
+              <Progress :value="balance.percentage_used" class="h-2" />
+              <div class="text-xs text-muted-foreground">
+                {{ balance.used_days }} used, {{ balance.remaining_days }} remaining
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Recent Activity and Upcoming Leave -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Requests -->
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Requests</CardTitle>
+            <CardDescription>Your latest leave requests</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-4">
+              <div v-if="props.recentRequests.length === 0" class="text-center text-muted-foreground py-4">
+                No recent requests
+              </div>
+              <div v-for="request in props.recentRequests" :key="request.id" class="flex items-start space-x-3 p-3 rounded-lg border">
+                <component :is="getStatusIcon(request.status)" class="h-5 w-5 mt-0.5" :class="{
+                  'text-green-500': request.status === 'approved',
+                  'text-yellow-500': request.status === 'pending',
+                  'text-red-500': request.status === 'rejected'
+                }" />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-medium">{{ request.leave_type }}</p>
+                    <Badge :variant="getStatusBadgeVariant(request.status)">{{ request.status }}</Badge>
+                  </div>
+                  <p class="text-sm text-muted-foreground">
+                    {{ request.start_date }} - {{ request.end_date }} ({{ request.days_requested }} days)
                   </p>
-                  <p class="text-xs text-muted-foreground">
-                    {{ activity.time }}
-                  </p>
+                  <p class="text-xs text-muted-foreground mt-1">{{ request.reason }}</p>
                 </div>
               </div>
             </div>
-            <div v-else class="text-sm text-muted-foreground">
-              No recent activity
-            </div>
           </CardContent>
         </Card>
 
-        <!-- Quick Actions -->
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks and shortcuts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div class="grid gap-2">
-              <a
-                :href="route('leave-requests.create')"
-                class="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-              >
-                <span class="text-sm font-medium">Request Leave</span>
-                <CalendarIcon class="h-4 w-4" />
-              </a>
+        <!-- Upcoming Leave & Team Status -->
+        <div class="space-y-6">
+          <!-- Upcoming Leave -->
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming Leave</CardTitle>
+              <CardDescription>Your approved future leave</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-3">
+                <div v-if="props.upcomingLeave.length === 0" class="text-center text-muted-foreground py-4">
+                  No upcoming leave scheduled
+                </div>
+                <div v-for="leave in props.upcomingLeave" :key="leave.id" class="flex items-center space-x-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                  <CalendarDaysIcon class="h-5 w-5 text-green-600" />
+                  <div class="flex-1">
+                    <p class="text-sm font-medium">{{ leave.leave_type }}</p>
+                    <p class="text-sm text-muted-foreground">
+                      {{ leave.start_date }} - {{ leave.end_date }}
+                    </p>
+                    <p class="text-xs text-green-600">In {{ leave.days_until }} days</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              <a
-                :href="route('leave-requests.index')"
-                class="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-              >
-                <span class="text-sm font-medium">View My Requests</span>
-                <FileCheckIcon class="h-4 w-4" />
-              </a>
-
-              <a
-                :href="route('employee.reports.index')"
-                class="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-              >
-                <span class="text-sm font-medium">My Reports</span>
-                <TrendingUpIcon class="h-4 w-4" />
-              </a>
-
-              <a
-                v-if="isManager"
-                :href="route('team.leave-requests.index')"
-                class="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-              >
-                <span class="text-sm font-medium">Team Requests</span>
-                <UsersIcon class="h-4 w-4" />
-              </a>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <!-- Charts Section (only show if we have data) -->
-      <div v-if="props.stats" class="space-y-6">
-        <!-- Leave Balance Chart -->
-        <Card v-if="props.stats.myLeaveBalance">
-          <CardHeader>
-            <CardTitle>My Leave Balance</CardTitle>
-            <CardDescription>Your current leave allocation and usage</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div id="leave-balance-chart" class="w-full"></div>
-          </CardContent>
-        </Card>
-
-        <!-- Monthly Leave Requests Chart -->
-        <Card v-if="props.stats.leavesByMonth?.length">
-          <CardHeader>
-            <CardTitle>Monthly Leave Requests</CardTitle>
-            <CardDescription>Leave request trends over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div id="monthly-leave-chart" class="w-full"></div>
-          </CardContent>
-        </Card>
-
-        <!-- Leave Types Distribution Chart -->
-        <Card v-if="props.stats.leavesByType?.length">
-          <CardHeader>
-            <CardTitle>Leave Types Distribution</CardTitle>
-            <CardDescription>Breakdown of leave requests by type</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div id="leave-type-chart" class="w-full"></div>
-          </CardContent>
-        </Card>
+          <!-- Team on Leave -->
+          <Card v-if="props.teamOnLeave.length > 0">
+            <CardHeader>
+              <CardTitle>Team Members on Leave</CardTitle>
+              <CardDescription>Current and upcoming team leave</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-3">
+                <div v-for="member in props.teamOnLeave" :key="member.user_name" class="flex items-center space-x-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <UsersIcon class="h-5 w-5 text-blue-600" />
+                  <div class="flex-1">
+                    <p class="text-sm font-medium">{{ member.user_name }}</p>
+                    <p class="text-sm text-muted-foreground">
+                      {{ member.leave_type }} - {{ member.start_date }} to {{ member.end_date }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   </AppLayout>

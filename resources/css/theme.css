@@ -1,0 +1,217 @@
+/* Theme System CSS Variables and Utilities */
+
+:root {
+  /* Base font sizes */
+  --font-size-base: 1rem;
+  --font-size-sm: calc(var(--font-size-base) * 0.875);
+  --font-size-lg: calc(var(--font-size-base) * 1.125);
+  --font-size-xl: calc(var(--font-size-base) * 1.25);
+  --font-size-2xl: calc(var(--font-size-base) * 1.5);
+  
+  /* Motion settings */
+  --motion-duration: 150ms;
+  --motion-delay: 0ms;
+  --motion-ease: ease-in-out;
+  
+  /* Sidebar settings */
+  --sidebar-width: 16rem;
+  --sidebar-collapsed-width: 4rem;
+  
+  /* Accent color (HSL values for better manipulation) */
+  --accent-color: 217 87% 50%; /* Default blue */
+  --accent-foreground: 210 40% 98%;
+}
+
+/* Font size adjustments */
+[data-font-size="small"] {
+  --font-size-base: 0.875rem;
+}
+
+[data-font-size="medium"] {
+  --font-size-base: 1rem;
+}
+
+[data-font-size="large"] {
+  --font-size-base: 1.125rem;
+}
+
+/* Accent color variations */
+[data-accent-color="blue"] {
+  --accent-color: 217 87% 50%;
+}
+
+[data-accent-color="green"] {
+  --accent-color: 142 87% 50%;
+}
+
+[data-accent-color="purple"] {
+  --accent-color: 256 87% 50%;
+}
+
+[data-accent-color="orange"] {
+  --accent-color: 33 87% 50%;
+}
+
+[data-accent-color="red"] {
+  --accent-color: 0 87% 50%;
+}
+
+[data-accent-color="pink"] {
+  --accent-color: 322 87% 50%;
+}
+
+/* Update primary color to use accent color */
+:root {
+  --primary: var(--accent-color);
+}
+
+/* Reduced motion preferences */
+.reduce-motion,
+[data-reduced-motion="true"] {
+  --motion-duration: 0s !important;
+  --motion-delay: 0s !important;
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: -1ms !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast mode */
+.high-contrast {
+  --background: 255 255 255;
+  --foreground: 0 0 0;
+  --muted: 245 245 245;
+  --muted-foreground: 64 64 64;
+  --border: 0 0 0;
+  --ring: 0 0 0;
+  --accent-color: 0 0% 0%;
+}
+
+.dark.high-contrast {
+  --background: 0 0 0;
+  --foreground: 255 255 255;
+  --muted: 23 23 23;
+  --muted-foreground: 191 191 191;
+  --border: 255 255 255;
+  --ring: 255 255 255;
+  --accent-color: 0 0% 100%;
+}
+
+/* Sidebar responsive behavior */
+@media (min-width: 768px) {
+  [data-sidebar-collapsed="true"] .sidebar {
+    width: var(--sidebar-collapsed-width);
+  }
+  
+  [data-sidebar-collapsed="true"] .sidebar .sidebar-text {
+    display: none;
+  }
+  
+  [data-sidebar-collapsed="true"] .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+  }
+}
+
+/* Apply motion variables to common components */
+.transition-all {
+  transition-duration: var(--motion-duration);
+  transition-timing-function: var(--motion-ease);
+}
+
+.animate-in {
+  animation-duration: var(--motion-duration);
+  animation-delay: var(--motion-delay);
+}
+
+/* Button primary color override */
+.btn-primary,
+.bg-primary {
+  background-color: hsl(var(--accent-color));
+}
+
+.text-primary {
+  color: hsl(var(--accent-color));
+}
+
+.border-primary {
+  border-color: hsl(var(--accent-color));
+}
+
+/* Focus rings with accent color */
+.focus\:ring-primary:focus {
+  --tw-ring-color: hsl(var(--accent-color) / 0.5);
+}
+
+/* Typography scale based on font size */
+.text-base {
+  font-size: var(--font-size-base);
+}
+
+.text-sm {
+  font-size: var(--font-size-sm);
+}
+
+.text-lg {
+  font-size: var(--font-size-lg);
+}
+
+.text-xl {
+  font-size: var(--font-size-xl);
+}
+
+.text-2xl {
+  font-size: var(--font-size-2xl);
+}
+
+/* Print styles - always light theme for printing */
+@media print {
+  * {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Ensure smooth transitions for theme switching */
+html {
+  transition: background-color var(--motion-duration) var(--motion-ease),
+              color var(--motion-duration) var(--motion-ease);
+}
+
+/* Custom scrollbar styling that respects theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Dark theme scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}

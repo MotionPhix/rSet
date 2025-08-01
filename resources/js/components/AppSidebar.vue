@@ -18,17 +18,17 @@ import {
   FileCheckIcon,
   HomeIcon,
   LayoutGrid,
-  UsersIcon,
   BarChart3,
   Building2,
   Settings,
-  HelpCircle,
   Users,
   UserCog,
   Shield,
-  Database
+  Database,
+  Calendar
 } from 'lucide-vue-next';
 import { computed } from 'vue';
+import {Separator} from '@/components/ui/separator';
 
 const page = usePage<SharedData>();
 
@@ -62,6 +62,13 @@ const mainNavItems = computed((): NavItem[] => {
       icon: CalendarIcon
     });
   }
+
+  /*// Calendar - available to all authenticated users
+  items.push({
+    title: 'Calendar',
+    href: route('calendar.index'),
+    icon: Calendar
+  });*/
 
   // Team Leave Requests - only for managers
   if (isManager.value && userAbilities.value.viewTeamLeaveRequests) {
@@ -170,24 +177,42 @@ const systemNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [];
 
   items.push({
-    title: 'System Settings',
-    href: route('settings.system'),
-    icon: Settings
+    title: 'Dashboard',
+    href: route('super-admin.dashboard'),
+    icon: LayoutGrid
   });
 
   if (userAbilities.value.manageAllCompanies) {
     items.push({
       title: 'Companies',
-      href: route('settings.companies'),
-      icon: Database
+      href: route('super-admin.companies.index'),
+      icon: Building2
     });
   }
+
+  items.push({
+    title: 'Subscriptions',
+    href: route('super-admin.subscriptions.index'),
+    icon: Database
+  });
+
+  items.push({
+    title: 'Analytics',
+    href: route('super-admin.analytics.index'),
+    icon: BarChart3
+  });
+
+  items.push({
+    title: 'System Settings',
+    href: route('super-admin.system.settings'),
+    icon: Settings
+  });
 
   if (userAbilities.value.viewSystemLogs) {
     items.push({
       title: 'System Logs',
-      href: route('settings.logs'),
-      icon: BarChart3
+      href: route('super-admin.system.logs'),
+      icon: FileCheckIcon
     });
   }
 
@@ -197,16 +222,11 @@ const systemNavItems = computed((): NavItem[] => {
 // Footer navigation items
 const footerNavItems = computed((): NavItem[] => [
   {
-    title: 'Settings',
-    href: isSuperAdmin.value ? route('settings.system') :
-          (isAdmin.value || isHR.value) ? route('settings.profile') :
-          route('employee.settings.profile'),
-    icon: Settings
-  },
-  {
-    title: 'Help',
-    href: '#',
-    icon: HelpCircle
+    title: 'Calendar',
+    href: isAdmin.value 
+      ? route('admin.calendar.index') // Admin calendar route
+      : route('calendar.index'), // Regular employees calendar route
+    icon: CalendarIcon
   }
 ]);
 
@@ -244,13 +264,16 @@ const allNavItems = computed(() => [
       </SidebarMenu>
     </SidebarHeader>
 
+    <Separator class="my-2" />
+
     <SidebarContent>
       <NavMain :items="allNavItems" />
     </SidebarContent>
 
     <SidebarFooter>
-      <NavUser />
       <NavFooter :items="footerNavItems" />
+      <Separator />
+      <NavUser />
     </SidebarFooter>
   </Sidebar>
 </template>

@@ -54,7 +54,63 @@ const breadcrumbs = [
 ];
 
 // Report data state
-const personalReportData = ref(null);
+const personalReportData = ref<{
+  yearly_summary?: any;
+  monthly_breakdown?: any;
+  leave_balance?: any;
+  detailed_requests?: Array<{
+    id: number;
+    type: string;
+    start_date: string;
+    end_date: string;
+    days: number;
+    status: string;
+    reason?: string;
+    applied_date: string;
+    approved_date?: string;
+    approver_name?: string;
+    week_of_year: number;
+    quarter: number;
+    is_weekend_adjacent: boolean;
+    is_long_weekend: boolean;
+  }>;
+  leave_type_breakdown?: Array<{
+    type: string;
+    total_requests: number;
+    approved_requests: number;
+    rejected_requests: number;
+    pending_requests: number;
+    total_days_used: number;
+    average_duration: number;
+    approval_rate: number;
+    most_recent_use?: string;
+  }>;
+  attendance_patterns?: {
+    quarterly_distribution: Record<string, number>;
+    monthly_pattern: Record<number, number>;
+    preferred_start_days: Record<string, number>;
+    peak_month: number;
+    least_active_month: number;
+    total_leave_blocks: number;
+    average_leave_duration: number;
+  };
+  forfeited_analysis?: {
+    annual_entitlement: number;
+    used_days: number;
+    remaining_days: number;
+    forfeited_days_this_year: number;
+    forfeited_days_last_year: number;
+    carry_over_limit: number;
+    utilization_rate: number;
+    projected_forfeit: number;
+    recommendations: string[];
+    optimal_usage_timeline: {
+      months_remaining?: number;
+      days_per_month_suggested?: number;
+      message: string;
+    };
+  };
+} | null>(null);
 const teamReportData = ref(null);
 const selectedYear = ref(new Date().getFullYear());
 const selectedMonth = ref(format(new Date(), 'yyyy-MM'));
@@ -142,7 +198,7 @@ const remainingLeaveColor = computed(() => {
   <AppLayout :breadcrumbs="breadcrumbs">
     <Head title="My Reports" />
 
-    <div class="space-y-6">
+    <div class="space-y-6 p-6 max-w-4xl">
       <!-- Header -->
       <HeadingSmall
         title="My Reports"
@@ -230,23 +286,25 @@ const remainingLeaveColor = computed(() => {
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Year</label>
                     <Select v-model="selectedYear" @update:model-value="fetchPersonalReport">
-                      <SelectTrigger>
-                        <SelectValue />
+                      <SelectTrigger class="w-full is-large">
+                        <SelectValue placeholder="Generate Report By Year" />
                       </SelectTrigger>
+
                       <SelectContent>
                         <SelectItem
                           v-for="year in availableYears"
                           :key="year"
-                          :value="year.toString()"
-                        >
+                          :value="year.toString()">
                           {{ year }}
                         </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <Button @click="fetchPersonalReport" :disabled="loading" class="w-full">
-                    <BarChart3 class="h-4 w-4 mr-2" />
+                  <Button 
+                    @click="fetchPersonalReport" 
+                    :disabled="loading" class="w-full is-large">
+                    <BarChart3 class="h-4 w-4" />
                     {{ loading ? 'Loading...' : 'Generate Report' }}
                   </Button>
                 </CardContent>
@@ -331,6 +389,198 @@ const remainingLeaveColor = computed(() => {
                 <div class="space-y-2">
                   <div class="text-sm text-muted-foreground">Rejected</div>
                   <div class="text-2xl font-bold text-red-600">{{ personalReportData.yearly_summary.rejected_requests }}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Forfeited Days Analysis -->
+          <Card v-if="personalReportData?.forfeited_analysis">
+            <CardHeader>
+              <CardTitle class="flex items-center gap-2">
+                <AlertCircle class="h-5 w-5" />
+                Leave Utilization & Forfeit Analysis
+              </CardTitle>
+              <CardDescription>Understand your leave usage patterns and avoid losing days</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-6">
+              <div class="grid gap-4 md:grid-cols-4">
+                <div class="space-y-2">
+                  <div class="text-sm text-muted-foreground">Utilization Rate</div>
+                  <div class="text-2xl font-bold">{{ personalReportData.forfeited_analysis.utilization_rate }}%</div>
+                </div>
+                <div class="space-y-2">
+                  <div class="text-sm text-muted-foreground">Remaining Days</div>
+                  <div class="text-2xl font-bold" :class="remainingLeaveColor">{{ personalReportData.forfeited_analysis.remaining_days }}</div>
+                </div>
+                <div class="space-y-2">
+                  <div class="text-sm text-muted-foreground">Projected Forfeit</div>
+                  <div class="text-2xl font-bold text-red-600">{{ personalReportData.forfeited_analysis.projected_forfeit }}</div>
+                </div>
+                <div class="space-y-2">
+                  <div class="text-sm text-muted-foreground">Last Year Forfeited</div>
+                  <div class="text-2xl font-bold text-red-600">{{ personalReportData.forfeited_analysis.forfeited_days_last_year }}</div>
+                </div>
+              </div>
+
+              <div v-if="personalReportData.forfeited_analysis.recommendations?.length" class="space-y-3">
+                <h4 class="font-medium text-sm">💡 Recommendations</h4>
+                <div class="space-y-2">
+                  <div
+                    v-for="(recommendation, index) in personalReportData.forfeited_analysis.recommendations"
+                    :key="index"
+                    class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800"
+                  >
+                    <p class="text-sm text-blue-800 dark:text-blue-200">{{ recommendation }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="personalReportData.forfeited_analysis.optimal_usage_timeline" class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <h4 class="font-medium text-sm text-green-800 dark:text-green-200 mb-2">📅 Optimal Usage Plan</h4>
+                <p class="text-sm text-green-700 dark:text-green-300">{{ personalReportData.forfeited_analysis.optimal_usage_timeline.message }}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Leave Type Breakdown -->
+          <Card v-if="personalReportData?.leave_type_breakdown?.length">
+            <CardHeader>
+              <CardTitle>Leave Type Analysis</CardTitle>
+              <CardDescription>Detailed breakdown by leave type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-4">
+                <div
+                  v-for="typeData in personalReportData.leave_type_breakdown"
+                  :key="typeData.type"
+                  class="p-4 rounded-lg border hover:bg-accent/50 transition-colors"
+                >
+                  <div class="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 class="font-medium capitalize">{{ typeData.type }}</h4>
+                      <p class="text-sm text-muted-foreground">{{ typeData.total_days_used }} days used • {{ typeData.approval_rate }}% approval rate</p>
+                    </div>
+                    <Badge variant="outline">{{ typeData.total_requests }} requests</Badge>
+                  </div>
+                  
+                  <div class="grid gap-3 md:grid-cols-4 text-sm">
+                    <div>
+                      <span class="text-muted-foreground">Approved:</span>
+                      <span class="ml-1 font-medium text-green-600">{{ typeData.approved_requests }}</span>
+                    </div>
+                    <div>
+                      <span class="text-muted-foreground">Rejected:</span>
+                      <span class="ml-1 font-medium text-red-600">{{ typeData.rejected_requests }}</span>
+                    </div>
+                    <div>
+                      <span class="text-muted-foreground">Avg Duration:</span>
+                      <span class="ml-1 font-medium">{{ typeData.average_duration }} days</span>
+                    </div>
+                    <div v-if="typeData.most_recent_use">
+                      <span class="text-muted-foreground">Last Used:</span>
+                      <span class="ml-1 font-medium">{{ format(new Date(typeData.most_recent_use), 'MMM dd') }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Attendance Patterns -->
+          <Card v-if="personalReportData?.attendance_patterns">
+            <CardHeader>
+              <CardTitle>Leave Patterns & Insights</CardTitle>
+              <CardDescription>Understanding your leave-taking behavior</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-6">
+              <div class="grid gap-4 md:grid-cols-3">
+                <div>
+                  <h4 class="font-medium text-sm mb-2">📊 Leave Statistics</h4>
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                      <span class="text-muted-foreground">Total leave blocks:</span>
+                      <span class="font-medium">{{ personalReportData.attendance_patterns.total_leave_blocks }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-muted-foreground">Average duration:</span>
+                      <span class="font-medium">{{ personalReportData.attendance_patterns.average_leave_duration }} days</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-muted-foreground">Peak month:</span>
+                      <span class="font-medium">{{ new Date(2024, personalReportData.attendance_patterns.peak_month - 1).toLocaleString('default', { month: 'long' }) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-medium text-sm mb-2">🗓️ Quarterly Distribution</h4>
+                  <div class="space-y-2 text-sm">
+                    <div v-for="(days, quarter) in personalReportData.attendance_patterns.quarterly_distribution" :key="quarter" class="flex justify-between">
+                      <span class="text-muted-foreground">{{ quarter }}:</span>
+                      <span class="font-medium">{{ days }} days</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-medium text-sm mb-2">📅 Preferred Start Days</h4>
+                  <div class="space-y-1 text-sm">
+                    <div 
+                      v-for="(count, day) in personalReportData.attendance_patterns.preferred_start_days" 
+                      :key="day"
+                      class="flex justify-between"
+                      v-show="count > 0"
+                    >
+                      <span class="text-muted-foreground">{{ day }}:</span>
+                      <span class="font-medium">{{ count }}x</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Detailed Leave History -->
+          <Card v-if="personalReportData?.detailed_requests?.length">
+            <CardHeader>
+              <CardTitle>Detailed Leave History {{ selectedYear }}</CardTitle>
+              <CardDescription>Complete record of all leave requests for the selected year</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-3 max-h-96 overflow-y-auto">
+                <div
+                  v-for="request in personalReportData.detailed_requests"
+                  :key="request.id"
+                  class="p-4 rounded-lg border hover:bg-accent/50 transition-colors"
+                >
+                  <div class="flex justify-between items-start mb-2">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <h4 class="font-medium capitalize">{{ request.type }}</h4>
+                        <Badge :variant="getStatusColor(request.status)">
+                          <component :is="getStatusIcon(request.status)" class="h-3 w-3 mr-1" />
+                          {{ request.status }}
+                        </Badge>
+                        <Badge v-if="request.is_long_weekend" variant="secondary" class="text-xs">Long Weekend</Badge>
+                      </div>
+                      <div class="text-sm text-muted-foreground">
+                        {{ format(new Date(request.start_date), 'MMM dd, yyyy') }} - {{ format(new Date(request.end_date), 'MMM dd, yyyy') }}
+                      </div>
+                      <div class="text-sm text-muted-foreground">
+                        {{ request.days }} {{ request.days === 1 ? 'day' : 'days' }} • Applied: {{ format(new Date(request.applied_date), 'MMM dd') }}
+                        <span v-if="request.approved_date"> • Approved: {{ format(new Date(request.approved_date), 'MMM dd') }}</span>
+                      </div>
+                    </div>
+                    <div class="text-right text-sm text-muted-foreground">
+                      <div>Q{{ request.quarter }} • Week {{ request.week_of_year }}</div>
+                      <div v-if="request.approver_name" class="text-xs">by {{ request.approver_name }}</div>
+                    </div>
+                  </div>
+                  
+                  <div v-if="request.reason" class="mt-3 p-2 bg-muted/50 rounded text-sm">
+                    <strong>Reason:</strong> {{ request.reason }}
+                  </div>
                 </div>
               </div>
             </CardContent>

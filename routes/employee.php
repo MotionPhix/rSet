@@ -3,15 +3,16 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Employee\ReportController;
+use App\Http\Controllers\Employee\DashboardController;
+use App\Http\Controllers\Employee\LeaveRequestController;
+use App\Http\Controllers\Employee\CalendarController;
 
 Route::middleware(['auth', 'verified', 'company.context'])->group(function () {
 
     // ============================================
     // EMPLOYEE DASHBOARD
     // ============================================
-    Route::get('/dashboard', function () {
-        return Inertia::render('employee/Dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // ============================================
     // EMPLOYEE REPORTS
@@ -27,38 +28,35 @@ Route::middleware(['auth', 'verified', 'company.context'])->group(function () {
     });
 
     // ============================================
+    // CALENDAR
+    // ============================================
+    Route::prefix('calendar')->group(function () {
+        Route::get('/', [CalendarController::class, 'index'])->name('calendar.index');
+        Route::get('/events', [CalendarController::class, 'getEvents'])->name('calendar.events');
+        
+        // Team calendar (only for managers)
+        Route::middleware(['role:manager'])->group(function () {
+            Route::get('/team-events', [CalendarController::class, 'getTeamEvents'])->name('calendar.team-events');
+        });
+    });
+
+    // ============================================
     // LEAVE REQUEST MANAGEMENT (Employee/Manager)
     // ============================================
     Route::middleware(['can:create_leave_request'])->group(function () {
-        Route::get('/leave-requests', function () {
-            return Inertia::render('employee/leave-requests/Index');
-        })->name('leave-requests.index');
-
-        Route::get('/leave-requests/create', function () {
-            return Inertia::render('employee/leave-requests/Create');
-        })->name('leave-requests.create');
-
-        Route::post('/leave-requests', function () {
-            // Handle leave request creation
-            return redirect()->route('leave-requests.index');
-        })->name('leave-requests.store');
+        Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
+        Route::get('/leave-requests/create', [LeaveRequestController::class, 'create'])->name('leave-requests.create');
+        Route::post('/leave-requests', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
     });
 
     Route::middleware(['can:view_own_leave_request'])->group(function () {
-        Route::get('/leave-requests/{leaveRequest}', function () {
-            return Inertia::render('employee/leave-requests/Show');
-        })->name('leave-requests.show');
+        Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
     });
 
     Route::middleware(['can:edit_own_leave_request'])->group(function () {
-        Route::get('/leave-requests/{leaveRequest}/edit', function () {
-            return Inertia::render('employee/leave-requests/Edit');
-        })->name('leave-requests.edit');
-
-        Route::put('/leave-requests/{leaveRequest}', function () {
-            // Handle leave request update
-            return redirect()->route('leave-requests.index');
-        })->name('leave-requests.update');
+        Route::get('/leave-requests/{leaveRequest}/edit', [LeaveRequestController::class, 'edit'])->name('leave-requests.edit');
+        Route::put('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'update'])->name('leave-requests.update');
+        Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'destroy'])->name('leave-requests.destroy');
     });
 
     Route::middleware(['can:delete_own_leave_request'])->group(function () {
@@ -73,24 +71,6 @@ Route::middleware(['auth', 'verified', 'company.context'])->group(function () {
             // Handle leave request cancellation
             return redirect()->route('leave-requests.index');
         })->name('leave-requests.cancel');
-    });
-
-    // ============================================
-    // EMPLOYEE SETTINGS (Personal settings only)
-    // ============================================
-    Route::prefix('settings')->group(function () {
-        // Personal Profile
-        Route::get('/profile', [App\Http\Controllers\Settings\ProfileController::class, 'edit'])->name('employee.settings.profile');
-        Route::patch('/profile', [App\Http\Controllers\Settings\ProfileController::class, 'update'])->name('employee.settings.profile.update');
-
-        // Password
-        Route::get('/password', [App\Http\Controllers\Settings\PasswordController::class, 'edit'])->name('employee.settings.password');
-        Route::put('/password', [App\Http\Controllers\Settings\PasswordController::class, 'update'])->name('employee.settings.password.update');
-
-        // Appearance
-        Route::get('/appearance', function () {
-            return Inertia::render('employee/settings/Appearance');
-        })->name('employee.settings.appearance');
     });
 
     // ============================================

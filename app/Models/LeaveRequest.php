@@ -3,12 +3,38 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class LeaveRequest extends Model
 {
   use \App\Traits\HasUuid;
 
   protected $fillable = ['user_id', 'approver_id', 'start_date', 'end_date', 'type', 'reason', 'status', 'company_id'];
+
+  protected $casts = [
+    'start_date' => 'date',
+    'end_date' => 'date',
+  ];
+
+  // Calculate the number of days for this leave request
+  public function getDaysAttribute()
+  {
+    return Carbon::parse($this->start_date)->diffInDays(Carbon::parse($this->end_date)) + 1;
+  }
+
+  // Get the display name for the leave type
+  public function getTypeDisplayName(): string
+  {
+    $types = [
+      'annual' => 'Annual Leave',
+      'sick' => 'Sick Leave', 
+      'personal' => 'Personal Leave',
+      'emergency' => 'Emergency Leave',
+      'unpaid' => 'Unpaid Leave',
+    ];
+
+    return $types[$this->type] ?? ucfirst($this->type) . ' Leave';
+  }
 
   // Employee who requested the leave
   public function user() {

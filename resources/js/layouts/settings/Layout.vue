@@ -49,23 +49,17 @@ const baseSettingsRoute = computed(() => {
 const personalNavItems = computed(() => [
   {
     title: 'Profile',
-    href: isSuperAdmin.value ? route('settings.profile') :
-          isAdmin.value ? route('settings.profile') :
-          route('employee.settings.profile'),
+    href: route('settings.profile'),
     icon: User,
   },
   {
     title: 'Password',
-    href: isSuperAdmin.value ? route('settings.password') :
-          isAdmin.value ? route('settings.password') :
-          route('employee.settings.password'),
+    href: route('settings.password'),
     icon: Lock,
   },
   {
     title: 'Appearance',
-    href: isSuperAdmin.value ? route('settings.appearance') :
-          isAdmin.value ? route('settings.appearance') :
-          route('employee.settings.appearance'),
+    href: route('settings.appearance'),
     icon: Palette,
   },
 ]);

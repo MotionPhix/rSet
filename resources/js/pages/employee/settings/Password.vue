@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
@@ -30,7 +30,7 @@ const showNewPassword = ref(false);
 const showConfirmPassword = ref(false);
 
 const updatePassword = () => {
-  form.put(route('employee.settings.password.update'), {
+  form.put(route('settings.password.update'), {
     preserveScroll: true,
     onSuccess: () => {
       toast.success('Password updated successfully');

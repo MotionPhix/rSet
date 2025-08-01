@@ -33,6 +33,7 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
+  avatar_url?: string;
   company_id: number | null;
   team_id: number | null;
   roles: Role[];
