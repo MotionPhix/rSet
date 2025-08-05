@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\TeamController;
 use App\Http\Controllers\Admin\LeaveTypeController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\CalendarController;
+use App\Http\Controllers\Admin\HolidayController;
 
 Route::middleware(['auth', 'verified', 'company.context', 'role:admin,hr'])->prefix('admin')->group(function () {
 
@@ -33,6 +34,18 @@ Route::middleware(['auth', 'verified', 'company.context', 'role:admin,hr'])->pre
             Route::get('/company-overview', [CalendarController::class, 'getCompanyOverview'])->name('admin.calendar.company-overview');
         });
     });
+
+    // ============================================
+    // HOLIDAYS (Admin/HR)
+    // ============================================
+    Route::resource('holidays', HolidayController::class)->names([
+        'index' => 'admin.holidays.index',
+        'store' => 'admin.holidays.store',
+        'update' => 'admin.holidays.update',
+        'destroy' => 'admin.holidays.destroy',
+    ]);
+    Route::get('/api/holidays/calendar', [HolidayController::class, 'getHolidaysForCalendar'])
+        ->name('admin.holidays.calendar');
 
     // ============================================
     // REPORTS & ANALYTICS (Admin/HR)

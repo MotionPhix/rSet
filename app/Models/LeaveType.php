@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Traits\HasUuid;
+use App\Traits\BelongsToCompany;
+use App\Enums\LeaveType as LeaveTypeEnum;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -11,11 +13,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class LeaveType extends Model
 {
-  use HasUuid;
-  use HasFactory;
+  use HasUuid, HasFactory, BelongsToCompany;
 
   protected $fillable = [
+    'company_id',
     'name',
+    'display_name',
     'description',
     'days_allowed',
     'min_duration',
@@ -31,17 +34,29 @@ class LeaveType extends Model
     'approvers',
     'requires_documentation',
     'documentation_type',
-    'company_id'
+    'color',
+    'background_color',
   ];
 
   protected $casts = [
     'allow_custom_duration' => 'boolean',
     'requires_approval' => 'boolean',
     'requires_documentation' => 'boolean',
-    'approvers' => 'array'
+    'approvers' => 'array',
+    'name' => LeaveTypeEnum::class,
   ];
 
-  // Dynamic attribute for pay tier description
+  /**
+   * Get the enum instance for this leave type.
+   */
+  public function getEnumAttribute(): LeaveTypeEnum
+  {
+    return $this->name;
+  }
+
+  /**
+   * Dynamic attribute for pay tier description.
+   */
   public function payTierDescription(): Attribute
   {
     return Attribute::make(

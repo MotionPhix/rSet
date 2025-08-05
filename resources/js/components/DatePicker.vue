@@ -12,25 +12,51 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { computed } from 'vue'
+import { computed, getCurrentInstance } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   placeholder?: string
+  min?: string
 }>()
 
-const value = defineModel<DateValue | null>({ required: true })
+// The component now accepts and emits ISO date strings
+const value = defineModel<string | null>({ required: true })
 
 const df = new DateFormatter('en-MW', {
   dateStyle: 'medium',
 })
 
+// Helper function to convert ISO string to DateValue
+const stringToDateValue = (dateString: string | null): DateValue | null => {
+  if (!dateString) return null
+  try {
+    return parseDate(dateString)
+  } catch {
+    return null
+  }
+}
+
+// Helper function to convert DateValue to ISO string
+const dateValueToString = (dateValue: DateValue | null): string | null => {
+  if (!dateValue) return null
+  try {
+    // DateValue toString() method returns ISO format (YYYY-MM-DD)
+    return dateValue.toString()
+  } catch {
+    return null
+  }
+}
+
 const displayDate = computed(() => {
   if (!value.value) return ''
 
   try {
-    const date = value.value instanceof CalendarDate
-      ? value.value.toDate(getLocalTimeZone())
-      : new Date(value.value)
+    const dateValue = stringToDateValue(value.value)
+    if (!dateValue) return ''
+    
+    const date = dateValue instanceof CalendarDate
+      ? dateValue.toDate(getLocalTimeZone())
+      : new Date(dateValue.toString())
 
     if (isNaN(date.getTime())) return ''
 
@@ -40,12 +66,26 @@ const displayDate = computed(() => {
   }
 })
 
-// Convert Date object back to CalendarDate when needed
+// Internal DateValue for the calendar component
 const calendarValue = computed({
-  get: () => value.value ? parseDate(value.value.toString()) : null,
-  set: (newValue) => {
-    value.value = newValue
+  get: () => stringToDateValue(value.value),
+  set: (newValue: DateValue | null) => {
+    value.value = dateValueToString(newValue)
   }
+})
+
+// Safe value for the calendar component (never null)
+const safeCalendarValue = computed({
+  get: () => calendarValue.value || undefined,
+  set: (newValue: DateValue | undefined) => {
+    calendarValue.value = newValue || null
+  }
+})
+
+// Convert min prop to DateValue if provided
+const minDateValue = computed(() => {
+  if (!props.min) return undefined
+  return stringToDateValue(props.min) || undefined
 })
 </script>
 
@@ -53,7 +93,6 @@ const calendarValue = computed({
   <Popover>
     <PopoverTrigger as-child>
       <Button
-        class="is-large"
         variant="outline"
         :class="cn(
           'w-full justify-start text-left font-normal',
@@ -66,8 +105,9 @@ const calendarValue = computed({
 
     <PopoverContent class="w-auto p-0">
       <Calendar
-        v-model="calendarValue"
-        :default-value="calendarValue || today(getLocalTimeZone())"
+        v-model="safeCalendarValue"
+        :default-value="safeCalendarValue || today(getLocalTimeZone())"
+        :min-value="minDateValue"
         initial-focus
       />
     </PopoverContent>

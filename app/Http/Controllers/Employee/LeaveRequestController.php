@@ -305,21 +305,62 @@ class LeaveRequestController extends Controller
         abort(403);
     }
 
-    $validTypes = implode(',', LeaveTypeService::getTypeKeys());
+    // Check if this is a drag operation (only dates provided)
+    $isDragOperation = $request->has('start_date') && $request->has('end_date') && 
+                       !$request->has('type') && !$request->has('reason');
 
-    $request->validate([
-      'start_date' => 'required|date|after_or_equal:today',
-      'end_date' => 'required|date|after_or_equal:start_date',
-      'type' => "required|in:{$validTypes}",
-      'reason' => 'nullable|string|max:500',
-    ]);
+    if ($isDragOperation) {
+        // For drag operations, only validate and update dates
+        $validated = $request->validate([
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+    } else {
+        // For full form updates, get valid types from the database
+        $validTypes = \App\Models\LeaveType::where('company_id', Auth::user()->company_id)
+            ->pluck('name')
+            ->map(fn($type) => $type->value)
+            ->implode(',');
 
-    $leaveRequest->update([
-        'start_date' => $request->start_date,
-        'end_date' => $request->end_date,
-        'type' => $request->type,
-        'reason' => $request->reason,
-    ]);
+        $validated = $request->validate([
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'type' => "required|in:{$validTypes}",
+            'reason' => 'nullable|string|max:500',
+        ]);
+    }
+
+    // Check for overlapping leave requests
+    $overlapping = LeaveRequest::where('user_id', Auth::id())
+        ->where('id', '!=', $leaveRequest->id)
+        ->where('status', '!=', 'rejected')
+        ->where(function ($query) use ($validated) {
+            $query->whereBetween('start_date', [$validated['start_date'], $validated['end_date']])
+                  ->orWhereBetween('end_date', [$validated['start_date'], $validated['end_date']])
+                  ->orWhere(function ($q) use ($validated) {
+                      $q->where('start_date', '<=', $validated['start_date'])
+                        ->where('end_date', '>=', $validated['end_date']);
+                  });
+        })
+        ->exists();
+
+    if ($overlapping) {
+        return back()->withErrors(['start_date' => 'You already have a leave request for these dates.']);
+    }
+
+    $leaveRequest->update($validated);
+
+    if ($request->wantsJson()) {
+        return response()->json([
+            'message' => 'Leave request updated successfully!',
+            'leave_request' => new LeaveRequestResource($leaveRequest->fresh()),
+        ]);
+    }
+
+    // Check if this was initiated from the calendar
+    if ($isDragOperation || $request->header('referer') && str_contains($request->header('referer'), '/calendar')) {
+        return redirect()->route('calendar.index')->with('success', 'Leave request updated successfully!');
+    }
 
     return redirect()->route('leave-requests.index')->with('success', 'Leave request updated successfully!');
   }

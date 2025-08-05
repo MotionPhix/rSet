@@ -13,26 +13,31 @@ import {
 import { format, parseISO } from 'date-fns';
 
 interface Event {
-  id: number;
+  id: string | number;
   title: string;
   start: string;
   end: string;
   type: string;
-  status: string;
+  status?: string;
   reason?: string;
-  user_name: string;
-  user_id: number;
-  days: number;
+  user_name?: string;
+  user_id?: number;
+  days?: number;
   color: string;
   backgroundColor: string;
   borderColor: string;
   allDay: boolean;
-  extendedProps: {
-    status: string;
-    type: string;
+  isHoliday?: boolean;
+  extendedProps?: {
+    status?: string;
+    type?: string;
     reason?: string;
-    appliedAt: string;
-    isOwnRequest: boolean;
+    appliedAt?: string;
+    isOwnRequest?: boolean;
+    description?: string;
+    isRecurring?: boolean;
+    recurrenceType?: string;
+    createdBy?: string;
   };
 }
 
@@ -93,6 +98,7 @@ const totalHiddenEvents = computed(() => {
 
 <template>
   <div
+    :data-date="format(date, 'yyyy-MM-dd')"
     class="min-h-[100px] border-r border-b last:border-r-0 relative group cursor-pointer hover:bg-accent/30 transition-colors"
     :class="{
       'bg-muted/20': !isCurrentMonth,
@@ -127,9 +133,9 @@ const totalHiddenEvents = computed(() => {
       >
         <div class="font-medium truncate" :title="event.title">{{ event.title }}</div>
         <div class="flex items-center gap-1 opacity-75 mt-0.5">
-          <component :is="getStatusIcon(event.status)" class="h-3 w-3 shrink-0" />
-          <span class="capitalize truncate">{{ event.status }}</span>
-          <span v-if="event.days > 1" class="text-xs opacity-60">({{ event.days }}d)</span>
+          <component :is="getStatusIcon(event.status || 'pending')" class="h-3 w-3 shrink-0" />
+          <span class="capitalize truncate">{{ event.status || 'holiday' }}</span>
+          <span v-if="event.days && event.days > 1" class="text-xs opacity-60">({{ event.days }}d)</span>
         </div>
       </div>
 
@@ -145,7 +151,7 @@ const totalHiddenEvents = computed(() => {
           <Users class="h-3 w-3 shrink-0" />
           <div class="font-medium truncate" :title="event.title">{{ event.title }}</div>
         </div>
-        <div class="opacity-75 mt-0.5 truncate">{{ event.user_name }}</div>
+        <div class="opacity-75 mt-0.5 truncate">{{ event.user_name || 'Team Member' }}</div>
       </div>
 
       <!-- More indicator -->

@@ -13,9 +13,11 @@ return new class extends Migration {
     Schema::create('leave_types', function (Blueprint $table) {
       $table->id();
       $table->uuid('uuid')->unique();
+      $table->foreignId('company_id')->constrained()->cascadeOnDelete();
 
       // Basic Info
-      $table->string('name');
+      $table->string('name'); // This will be the enum value (annual, sick, etc.)
+      $table->string('display_name'); // This will be the display name (Annual Leave, etc.)
       $table->string('description')->nullable();
       $table->integer('days_allowed');
 
@@ -40,6 +42,13 @@ return new class extends Migration {
       // Documentation
       $table->boolean('requires_documentation')->default(false);
       $table->string('documentation_type')->nullable();
+
+      // Calendar colors
+      $table->string('color', 7)->default('#3b82f6');
+      $table->string('background_color', 7)->default('#dbeafe');
+
+      // Make sure each company can only have one of each leave type
+      $table->unique(['company_id', 'name']);
 
       $table->timestamps();
     });

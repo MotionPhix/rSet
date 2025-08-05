@@ -1,22 +1,28 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { toast } from 'vue-sonner';
 import AppLayout from '@/layouts/AppLayout.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import CalendarDayCell from '@/components/calendar/CalendarDayCell.vue';
-import CalendarEvent from '@/components/calendar/CalendarEvent.vue';
 import CalendarWeekView from '@/components/calendar/CalendarWeekView.vue';
 import CalendarMobileView from '@/components/calendar/CalendarMobileView.vue';
 import CalendarStats from '@/components/calendar/CalendarStats.vue';
+import CalendarMonthView from '@/components/calendar/CalendarMonthView.vue';
+import EditLeaveDialog from '@/components/calendar/EditLeaveDialog.vue';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { 
+  AlertDialog, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import InputError from '@/components/InputError.vue';
@@ -35,14 +41,24 @@ import {
   AlertCircle,
   User,
   Filter,
-  Download,
-  Settings,
-  CalendarDays,
-  ChevronUp,
-  ChevronDown
 } from 'lucide-vue-next';
-import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameMonth, isSameDay, isToday, parseISO } from 'date-fns';
+import { 
+  format, 
+  addDays, 
+  addWeeks, 
+  subWeeks, 
+  addMonths, 
+  subMonths, 
+  startOfWeek, 
+  endOfWeek, 
+  startOfMonth, 
+  endOfMonth, 
+  isSameMonth, 
+  isToday, 
+  parseISO 
+} from 'date-fns';
 import DatePicker from '@/components/DatePicker.vue';
+import { dragService } from '@/services/dragService';
 
 interface Props {
   currentDate: string;
@@ -71,6 +87,24 @@ interface Props {
     };
   }>;
   teamData: Array<any>;
+  holidayData?: Array<{
+    id: string;
+    title: string;
+    start: string;
+    end: string;
+    allDay: boolean;
+    backgroundColor: string;
+    borderColor: string;
+    textColor: string;
+    type: 'holiday';
+    isHoliday: boolean;
+    extendedProps: {
+      description?: string;
+      isRecurring: boolean;
+      recurrenceType: string;
+      createdBy: string;
+    };
+  }>;
   leaveTypes: Array<{
     value: string;
     label: string;
@@ -82,7 +116,9 @@ interface Props {
   };
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  holidayData: () => [],
+});
 
 const breadcrumbs = [
   { title: 'Dashboard', href: '/dashboard' },
@@ -95,6 +131,8 @@ const currentView = ref<'month' | 'week'>(props.view);
 const selectedEvent = ref<any>(null);
 const showEventDetails = ref(false);
 const showCreateForm = ref(false);
+const showEditForm = ref(false);
+const editingEvent = ref<any>(null);
 const showTeamCalendar = ref(false);
 const selectedFilters = ref<string[]>(['approved', 'pending']);
 
@@ -158,6 +196,10 @@ const filteredEvents = computed(() => {
   );
 });
 
+const allEvents = computed(() => {
+  return [...filteredEvents.value, ...(props.holidayData || [])];
+});
+
 const teamEvents = computed(() => {
   if (!showTeamCalendar.value || !props.userPermissions.canViewTeam) {
     return [];
@@ -178,7 +220,7 @@ const monthDays = computed(() => {
   let current = startDate;
   
   while (current <= endDate) {
-    const dayEvents = filteredEvents.value.filter(event => {
+    const dayEvents = allEvents.value.filter(event => {
       const eventStart = parseISO(event.start);
       const eventEnd = parseISO(event.end);
       return current >= eventStart && current < eventEnd;
@@ -238,6 +280,51 @@ const weekDays = computed(() => {
 const openEventDetails = (event: any) => {
   selectedEvent.value = event;
   showEventDetails.value = true;
+};
+
+const openEditDialog = (event: any) => {
+  editingEvent.value = event;
+  showEditForm.value = true;
+};
+
+const onLeaveUpdated = () => {
+  // Refresh the calendar to show the updated request
+  updateCalendar();
+  
+  // Also refresh if we're in the middle of a drag operation
+  if (dragService.isDragging()) {
+    // Wait a bit for the backend to update, then refresh
+    setTimeout(() => {
+      updateCalendar();
+    }, 500);
+  }
+};
+
+const onStartDrag = (event: MouseEvent) => {
+  // Handle drag start for pending leave requests
+  // This could be used to implement drag-to-resize functionality
+  console.log('Drag started', event);
+};
+
+const onStartHorizontalResize = (mouseEvent: MouseEvent, eventData: any, direction: 'left' | 'right') => {
+  const calendarElement = document.querySelector('.calendar-month-view') as HTMLElement;
+  if (calendarElement) {
+    dragService.startHorizontalDrag(mouseEvent, eventData, direction, calendarElement);
+  }
+};
+
+const onStartVerticalResize = (mouseEvent: MouseEvent, eventData: any, direction: 'up' | 'down') => {
+  const calendarElement = document.querySelector('.calendar-month-view') as HTMLElement;
+  if (calendarElement) {
+    dragService.startVerticalDrag(mouseEvent, eventData, direction, calendarElement);
+  }
+};
+
+const onStartMove = (mouseEvent: MouseEvent, eventData: any) => {
+  const calendarElement = document.querySelector('.calendar-month-view') as HTMLElement;
+  if (calendarElement) {
+    dragService.startMoveDrag(mouseEvent, eventData, calendarElement);
+  }
 };
 
 const openDayView = (date: Date) => {
@@ -330,10 +417,10 @@ const validateForm = () => {
 
   // Validate end date is not before start date
   if (newLeaveForm.value.start_date && newLeaveForm.value.end_date) {
-    const startDate = parseISO(newLeaveForm.value.start_date);
-    const endDate = parseISO(newLeaveForm.value.end_date);
+    const startDate = new Date(newLeaveForm.value.start_date);
+    const endDate = new Date(newLeaveForm.value.end_date);
     
-    if (endDate < startDate) {
+    if (startDate && endDate && endDate < startDate) {
       formErrors.value.end_date = 'End date cannot be earlier than start date';
       isValid = false;
     }
@@ -414,25 +501,27 @@ watch(() => newLeaveForm.value.start_date, (newStartDate) => {
   
   if (formErrors.value.end_date && newStartDate && newLeaveForm.value.end_date) {
     // Re-validate end date when start date changes
-    const startDate = parseISO(newStartDate);
-    const endDate = parseISO(newLeaveForm.value.end_date);
+    const startDate = new Date(newStartDate);
+    const endDate = new Date(newLeaveForm.value.end_date);
     
-    if (endDate >= startDate) {
+    if (startDate && endDate && endDate >= startDate) {
       formErrors.value.end_date = '';
     }
   }
 });
 
 // Watch for end date changes to validate against start date
-watch(() => newLeaveForm.value.end_date, (newEndDate) => {
+watch(() => newLeaveForm.value.end_date, (newEndDate) => {  
   if (newEndDate && newLeaveForm.value.start_date) {
-    const startDate = parseISO(newLeaveForm.value.start_date);
-    const endDate = parseISO(newEndDate);
+    const startDate = new Date(newLeaveForm.value.start_date);
+    const endDate = new Date(newEndDate);
     
-    if (endDate < startDate) {
-      formErrors.value.end_date = 'End date cannot be earlier than start date';
-    } else {
-      formErrors.value.end_date = '';
+    if (startDate && endDate) {
+      if (endDate < startDate) {
+        formErrors.value.end_date = 'End date cannot be earlier than start date';
+      } else {
+        formErrors.value.end_date = '';
+      }
     }
   }
 });
@@ -455,10 +544,6 @@ watch(showCreateForm, (isOpen) => {
   if (!isOpen) {
     resetForm();
   }
-});
-
-onMounted(() => {
-  // Any initialization logic
 });
 </script>
 
@@ -511,18 +596,19 @@ onMounted(() => {
           </div>
 
           <!-- Actions -->
-          <Dialog v-model:open="showCreateForm" v-if="props.userPermissions.canCreateLeave">
+          <AlertDialog 
+            v-model:open="showCreateForm" v-if="props.userPermissions.canCreateLeave">
             <Button size="sm" @click="openCreateDialog">
               <Plus class="h-4 w-4 mr-1" />
               New Leave
             </Button>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Leave Request</DialogTitle>
-                <DialogDescription>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Create Leave Request</AlertDialogTitle>
+                <AlertDialogDescription>
                   Submit a new leave request for approval.
-                </DialogDescription>
-              </DialogHeader>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
               <div class="space-y-6">
                 <div class="space-y-2">
                   <Label for="type">Leave Type</Label>
@@ -545,9 +631,8 @@ onMounted(() => {
                 <div class="grid grid-cols-2 gap-4">
                   <div class="space-y-2">
                     <Label for="start_date">Start Date</Label>
-                    <Input
+                    <DatePicker
                       id="start_date"
-                      type="date"
                       v-model="newLeaveForm.start_date"
                       :min="format(new Date(), 'yyyy-MM-dd')"
                       required
@@ -557,9 +642,8 @@ onMounted(() => {
                   
                   <div class="space-y-2">
                     <Label for="end_date">End Date</Label>
-                    <Input
+                    <DatePicker
                       id="end_date"
-                      type="date"
                       v-model="newLeaveForm.end_date"
                       :min="newLeaveForm.start_date || format(new Date(), 'yyyy-MM-dd')"
                       required
@@ -582,7 +666,7 @@ onMounted(() => {
                   </p>
                 </div>
               </div>
-              <DialogFooter>
+              <AlertDialogFooter>
                 <Button variant="outline" @click="showCreateForm = false" :disabled="isSubmitting">
                   Cancel
                 </Button>
@@ -593,9 +677,9 @@ onMounted(() => {
                   </div>
                   <span v-else>Submit Request</span>
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -682,31 +766,18 @@ onMounted(() => {
       <Card class="hidden lg:block">
         <CardContent class="p-0">
           <!-- Month View -->
-          <div v-if="currentView === 'month'" class="grid grid-cols-7 border-b">
-            <!-- Week header -->
-            <div
-              v-for="day in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']"
-              :key="day"
-              class="p-3 text-center font-medium text-sm border-r last:border-r-0 bg-muted/50"
-            >
-              {{ day }}
-            </div>
-            
-            <!-- Month days -->
-            <CalendarDayCell
-              v-for="day in monthDays"
-              :key="day.date.getTime()"
-              :date="day.date"
-              :events="day.events"
-              :team-events="day.teamEvents"
-              :is-today="day.isToday"
-              :is-current-month="day.isCurrentMonth"
-              :show-team-events="showTeamCalendar"
-              :max-visible="2"
-              @event-click="openEventDetails"
-              @day-click="openDayView"
-            />
-          </div>
+          <CalendarMonthView
+            v-if="currentView === 'month'"
+            :month-days="monthDays"
+            :show-team-events="showTeamCalendar"
+            :can-edit-events="props.userPermissions.canCreateLeave"
+            @event-click="openEventDetails"
+            @day-click="openDayView"
+            @edit-event="openEditDialog"
+            @start-horizontal-resize="onStartHorizontalResize"
+            @start-vertical-resize="onStartVerticalResize"
+            @start-move="onStartMove"
+          />
 
           <!-- Week View -->
           <CalendarWeekView
@@ -716,9 +787,13 @@ onMounted(() => {
             :team-events="teamEvents"
             :show-team-events="showTeamCalendar"
             @event-click="openEventDetails"
+            @edit-event="openEditDialog"
             @date-click="openDayView"
             @prev-week="navigateCalendar('prev')"
             @next-week="navigateCalendar('next')"
+            @start-horizontal-resize="onStartHorizontalResize"
+            @start-vertical-resize="onStartVerticalResize"
+            @start-move="onStartMove"
           />
         </CardContent>
       </Card>
@@ -726,18 +801,18 @@ onMounted(() => {
       </div>
 
       <!-- Event Details Dialog -->
-      <Dialog v-model:open="showEventDetails">
-        <DialogContent v-if="selectedEvent">
-          <DialogHeader>
-            <DialogTitle class="flex items-center gap-2">
+      <AlertDialog v-model:open="showEventDetails">
+        <AlertDialogContent v-if="selectedEvent">
+          <AlertDialogHeader>
+            <AlertDialogTitle class="flex items-center gap-2">
               <component :is="getStatusIcon(selectedEvent.status)" class="h-5 w-5" />
               {{ selectedEvent.title }}
-            </DialogTitle>
-            <DialogDescription>
+            </AlertDialogTitle>
+            <AlertDialogDescription>
               Leave request details and information
-            </DialogDescription>
-          </DialogHeader>
-          
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -790,7 +865,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <DialogFooter>
+          <AlertDialogFooter>
             <Button variant="outline" @click="showEventDetails = false">
               Close
             </Button>
@@ -801,9 +876,17 @@ onMounted(() => {
               <Eye class="h-4 w-4 mr-1" />
               View Details
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <!-- Edit Leave Dialog -->
+      <EditLeaveDialog
+        v-model:show="showEditForm"
+        :event="editingEvent"
+        :leave-types="props.leaveTypes"
+        @updated="onLeaveUpdated"
+      />
     </div>
   </AppLayout>
 </template>

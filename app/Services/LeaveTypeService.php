@@ -2,33 +2,29 @@
 
 namespace App\Services;
 
+use App\Enums\LeaveType;
+use App\Models\LeaveType as LeaveTypeModel;
+
 class LeaveTypeService
 {
     /**
-     * Get all available leave types.
+     * Get all available leave types from enum.
      */
     public static function getTypes(): array
     {
-        return [
-            'annual' => 'Annual Leave',
-            'sick' => 'Sick Leave',
-            'personal' => 'Personal Leave',
-            'emergency' => 'Emergency Leave',
-            'unpaid' => 'Unpaid Leave',
-        ];
+        $types = [];
+        foreach (LeaveType::cases() as $case) {
+            $types[$case->value] = $case->label();
+        }
+        return $types;
     }
 
     /**
-     * Get leave types for select options (with proper values).
+     * Get leave types for select options.
      */
     public static function getSelectOptions(): array
     {
-        return collect(self::getTypes())->map(function ($label, $value) {
-            return [
-                'value' => $value,
-                'label' => $label,
-            ];
-        })->values()->toArray();
+        return LeaveType::options();
     }
 
     /**
@@ -36,100 +32,76 @@ class LeaveTypeService
      */
     public static function getDetailedOptions(): array
     {
-        $detailedTypes = [
-            'annual' => [
-                'value' => 'annual',
-                'label' => 'Annual Leave',
-                'description' => 'Yearly vacation leave for rest and personal time',
-                'days_allowed' => 25,
+        $detailedTypes = [];
+        
+        foreach (LeaveType::cases() as $leaveType) {
+            $detailedTypes[$leaveType->value] = [
+                'value' => $leaveType->value,
+                'label' => $leaveType->label(),
+                'description' => $leaveType->description(),
+                'days_allowed' => $leaveType->defaultDaysAllowed(),
                 'min_duration' => 1,
-                'max_duration' => 21,
+                'max_duration' => $leaveType->defaultDaysAllowed(),
                 'allow_custom_duration' => true,
-                'gender' => null,
-                'min_employment_months' => 3,
-                'cooldown_days' => null,
-                'max_usage_per_year' => null,
-                'full_pay_days' => 25,
-                'half_pay_days' => 0,
-                'requires_approval' => true,
-                'requires_documentation' => false,
-                'documentation_type' => null,
-            ],
-            'sick' => [
-                'value' => 'sick',
-                'label' => 'Sick Leave',
-                'description' => 'Medical leave for illness or health appointments',
-                'days_allowed' => 10,
-                'min_duration' => 1,
-                'max_duration' => 10,
-                'allow_custom_duration' => true,
-                'gender' => null,
-                'min_employment_months' => 1,
-                'cooldown_days' => null,
-                'max_usage_per_year' => null,
-                'full_pay_days' => 10,
-                'half_pay_days' => 0,
-                'requires_approval' => false,
-                'requires_documentation' => true,
-                'documentation_type' => 'medical_certificate',
-            ],
-            'personal' => [
-                'value' => 'personal',
-                'label' => 'Personal Leave',
-                'description' => 'Personal time off for non-medical emergencies',
-                'days_allowed' => 5,
-                'min_duration' => 1,
-                'max_duration' => 5,
-                'allow_custom_duration' => true,
-                'gender' => null,
-                'min_employment_months' => 6,
-                'cooldown_days' => 30,
-                'max_usage_per_year' => 2,
-                'full_pay_days' => 3,
-                'half_pay_days' => 2,
-                'requires_approval' => true,
-                'requires_documentation' => false,
-                'documentation_type' => null,
-            ],
-            'emergency' => [
-                'value' => 'emergency',
-                'label' => 'Emergency Leave',
-                'description' => 'Urgent family or personal emergencies',
-                'days_allowed' => 3,
-                'min_duration' => 1,
-                'max_duration' => 3,
-                'allow_custom_duration' => false,
-                'gender' => null,
-                'min_employment_months' => 1,
-                'cooldown_days' => null,
-                'max_usage_per_year' => 3,
-                'full_pay_days' => 2,
-                'half_pay_days' => 1,
-                'requires_approval' => true,
-                'requires_documentation' => true,
-                'documentation_type' => 'emergency_proof',
-            ],
-            'unpaid' => [
-                'value' => 'unpaid',
-                'label' => 'Unpaid Leave',
-                'description' => 'Extended leave without pay for personal reasons',
-                'days_allowed' => 90,
-                'min_duration' => 5,
-                'max_duration' => 90,
-                'allow_custom_duration' => true,
-                'gender' => null,
-                'min_employment_months' => 12,
-                'cooldown_days' => 90,
-                'max_usage_per_year' => 1,
-                'full_pay_days' => 0,
-                'half_pay_days' => 0,
-                'requires_approval' => true,
-                'requires_documentation' => true,
-                'documentation_type' => 'justification_letter',
-            ],
-        ];
-
-        return collect($detailedTypes)->values()->toArray();
+                'gender' => match($leaveType) {
+                    LeaveType::MATERNITY => 'female',
+                    LeaveType::PATERNITY => 'male',
+                    default => null,
+                },
+                'min_employment_months' => match($leaveType) {
+                    LeaveType::ANNUAL => 3,
+                    LeaveType::MATERNITY, LeaveType::PATERNITY => 6,
+                    LeaveType::STUDY => 12,
+                    default => 0,
+                },
+                'cooldown_days' => match($leaveType) {
+                    LeaveType::PERSONAL => 30,
+                    LeaveType::EMERGENCY => 60,
+                    LeaveType::STUDY => 365,
+                    default => null,
+                },
+                'max_usage_per_year' => match($leaveType) {
+                    LeaveType::PERSONAL => 2,
+                    LeaveType::EMERGENCY => 3,
+                    LeaveType::MATERNITY, LeaveType::PATERNITY => 1,
+                    LeaveType::BEREAVEMENT => 2,
+                    LeaveType::STUDY => 1,
+                    default => null,
+                },
+                'full_pay_days' => match($leaveType) {
+                    LeaveType::ANNUAL => $leaveType->defaultDaysAllowed(),
+                    LeaveType::SICK => 7,
+                    LeaveType::PERSONAL => 3,
+                    LeaveType::MATERNITY => 84,
+                    LeaveType::PATERNITY => 7,
+                    LeaveType::BEREAVEMENT => 5,
+                    LeaveType::EMERGENCY => 3,
+                    LeaveType::STUDY => 10,
+                    LeaveType::COMPASSIONATE => 5,
+                    default => 0,
+                },
+                'half_pay_days' => match($leaveType) {
+                    LeaveType::SICK => 3,
+                    LeaveType::PERSONAL => 2,
+                    LeaveType::COMPASSIONATE => 2,
+                    default => 0,
+                },
+                'requires_approval' => $leaveType->requiresApproval(),
+                'requires_documentation' => $leaveType->requiresDocumentation(),
+                'documentation_type' => match($leaveType) {
+                    LeaveType::SICK => 'medical_certificate',
+                    LeaveType::MATERNITY => 'medical_certificate',
+                    LeaveType::PATERNITY => 'birth_certificate',
+                    LeaveType::BEREAVEMENT => 'death_certificate',
+                    LeaveType::STUDY => 'enrollment_letter',
+                    default => null,
+                },
+                'color' => $leaveType->color(),
+                'backgroundColor' => $leaveType->backgroundColor(),
+            ];
+        }
+        
+        return $detailedTypes;
     }
 
     /**
@@ -137,7 +109,7 @@ class LeaveTypeService
      */
     public static function getTypeKeys(): array
     {
-        return array_keys(self::getTypes());
+        return LeaveType::toArray();
     }
 
     /**
@@ -145,7 +117,20 @@ class LeaveTypeService
      */
     public static function isValidType(string $type): bool
     {
-        return array_key_exists($type, self::getTypes());
+        return LeaveType::fromString($type) !== null;
+    }
+
+    /**
+     * Get leave type from company database.
+     */
+    public static function getCompanyLeaveTypes(int $companyId): array
+    {
+        return LeaveTypeModel::where('company_id', $companyId)
+            ->get()
+            ->mapWithKeys(function ($leaveType) {
+                return [$leaveType->name->value => $leaveType->display_name];
+            })
+            ->toArray();
     }
 
     /**

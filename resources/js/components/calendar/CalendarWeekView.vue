@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import CalendarEventStrip from '@/components/calendar/CalendarEventStrip.vue';
 import { 
   Clock, 
   CheckCircle2, 
@@ -14,27 +15,24 @@ import {
   Users,
   MapPin
 } from 'lucide-vue-next';
-import { format, startOfWeek, endOfWeek, addDays, isToday, isSameDay } from 'date-fns';
-
-interface Event {
-  id: number;
-  title: string;
-  start: string;
-  end: string;
-  status: string;
-  user_name: string;
-  days: number;
-  backgroundColor: string;
-  borderColor: string;
-  extendedProps: {
-    isOwnRequest: boolean;
-  };
-}
+import { 
+  format, 
+  startOfWeek, 
+  endOfWeek, 
+  addDays, 
+  isToday, 
+  isSameDay, 
+  parseISO, 
+  differenceInDays,
+  min,
+  max
+} from 'date-fns';
+import type { CalendarEvent } from '@/types/calendar';
 
 interface Props {
   currentDate: Date;
-  events: Event[];
-  teamEvents?: Event[];
+  events: CalendarEvent[];
+  teamEvents?: CalendarEvent[];
   showTeamEvents?: boolean;
 }
 
@@ -44,28 +42,37 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  eventClick: [event: Event];
+  eventClick: [event: CalendarEvent];
   dateClick: [date: Date];
+  editEvent: [event: CalendarEvent];
+  startHorizontalResize: [mouseEvent: MouseEvent, eventData: CalendarEvent, direction: 'left' | 'right'];
+  startVerticalResize: [mouseEvent: MouseEvent, eventData: CalendarEvent, direction: 'up' | 'down'];
+  startMove: [mouseEvent: MouseEvent, eventData: CalendarEvent];
   prevWeek: [];
   nextWeek: [];
 }>();
 
+const weekStart = computed(() => startOfWeek(props.currentDate));
+const weekEnd = computed(() => endOfWeek(props.currentDate));
+
 const weekDays = computed(() => {
-  const start = startOfWeek(props.currentDate);
+  const start = weekStart.value;
   const days = [];
   
   for (let i = 0; i < 7; i++) {
     const date = addDays(start, i);
+    
+    // Only include single-day events in day cells
     const dayEvents = props.events.filter(event => {
-      const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-      return date >= eventStart && date < eventEnd;
+      const eventStart = parseISO(event.start);
+      const eventEnd = parseISO(event.end);
+      return isSameDay(date, eventStart) && differenceInDays(eventEnd, eventStart) === 0;
     });
     
     const dayTeamEvents = props.showTeamEvents ? props.teamEvents.filter(event => {
-      const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-      return date >= eventStart && date < eventEnd;
+      const eventStart = parseISO(event.start);
+      const eventEnd = parseISO(event.end);
+      return isSameDay(date, eventStart) && differenceInDays(eventEnd, eventStart) === 0;
     }) : [];
     
     days.push({
@@ -77,6 +84,96 @@ const weekDays = computed(() => {
   }
   
   return days;
+});
+
+// Calculate event strips for multi-day events
+const eventStrips = computed(() => {
+  const strips: Array<{
+    event: CalendarEvent;
+    startCol: number;
+    spanCols: number;
+    stripRow: number;
+  }> = [];
+
+  // Get all unique multi-day events
+  const allEvents = [...props.events];
+  if (props.showTeamEvents) {
+    allEvents.push(...props.teamEvents);
+  }
+
+  const uniqueEvents = new Map<string | number, CalendarEvent>();
+  allEvents.forEach(event => {
+    uniqueEvents.set(event.id, event);
+  });
+
+  // Filter and sort multi-day events
+  const multiDayEvents = Array.from(uniqueEvents.values())
+    .filter(event => {
+      const eventStart = parseISO(event.start);
+      const eventEnd = parseISO(event.end);
+      return differenceInDays(eventEnd, eventStart) > 0;
+    })
+    .sort((a, b) => {
+      const startCompare = parseISO(a.start).getTime() - parseISO(b.start).getTime();
+      if (startCompare !== 0) return startCompare;
+      return (b.days || 1) - (a.days || 1);
+    });
+
+  // Track occupied positions
+  const rowOccupancy: Array<Array<{ start: number; end: number }>> = [];
+
+  multiDayEvents.forEach(event => {
+    const eventStart = parseISO(event.start);
+    const eventEnd = parseISO(event.end);
+
+    // Check if event overlaps with this week
+    if (!(eventEnd < weekStart.value || eventStart > weekEnd.value)) {
+      // Calculate columns within the week
+      const clampedStart = max([eventStart, weekStart.value]);
+      const clampedEnd = min([eventEnd, weekEnd.value]);
+
+      const startCol = weekDays.value.findIndex(day => isSameDay(day.date, clampedStart)) + 1;
+      const endCol = weekDays.value.findIndex(day => isSameDay(day.date, clampedEnd)) + 1;
+
+      if (startCol > 0 && endCol > 0) {
+        const spanCols = endCol - startCol + 1;
+
+        // Find available row
+        let stripRow = 0;
+        while (stripRow < rowOccupancy.length) {
+          const conflicts = rowOccupancy[stripRow].some(occupied => 
+            !(endCol < occupied.start || startCol > occupied.end)
+          );
+          if (!conflicts) break;
+          stripRow++;
+        }
+
+        // Create row if needed
+        if (stripRow >= rowOccupancy.length) {
+          rowOccupancy.push([]);
+        }
+
+        // Mark as occupied
+        rowOccupancy[stripRow].push({ start: startCol, end: endCol });
+
+        // Add strip
+        strips.push({
+          event,
+          startCol,
+          spanCols,
+          stripRow,
+        });
+      }
+    }
+  });
+
+  return strips;
+});
+
+const maxStripRows = computed(() => {
+  return Math.max(1, eventStrips.value.reduce((max, strip) => 
+    Math.max(max, strip.stripRow + 1), 0
+  ));
 });
 
 const weekDateRange = computed(() => {
@@ -144,47 +241,70 @@ const getStatusColor = (status: string) => {
       </div>
 
       <!-- All-day events section -->
-      <div class="grid grid-cols-8 border-b bg-muted/20">
+      <div class="grid grid-cols-8 border-b bg-muted/20 relative" :style="{ minHeight: `${(maxStripRows * 28) + 60}px` }">
         <div class="p-3 border-r text-sm font-medium text-muted-foreground">
           All Day
         </div>
-        <div
-          v-for="day in weekDays"
-          :key="`allday-${day.date.getTime()}`"
-          class="p-2 border-r last:border-r-0 min-h-[80px] space-y-1 cursor-pointer hover:bg-accent/50 transition-colors"
-          :class="{ 'bg-blue-50 dark:bg-blue-950/30': day.isToday }"
-          @click="emit('dateClick', day.date)"
-        >
-          <!-- Personal events -->
+        
+        <!-- Day columns -->
+        <div class="col-span-7 grid grid-cols-7 relative">
           <div
-            v-for="event in day.events"
-            :key="event.id"
-            class="text-xs p-1.5 rounded cursor-pointer hover:shadow-sm transition-all"
-            :style="{ backgroundColor: event.backgroundColor, borderLeft: `3px solid ${event.borderColor}` }"
-            @click.stop="emit('eventClick', event)"
+            v-for="day in weekDays"
+            :key="`allday-${day.date.getTime()}`"
+            class="p-2 border-r last:border-r-0 cursor-pointer hover:bg-accent/50 transition-colors"
+            :class="{ 'bg-blue-50 dark:bg-blue-950/30': day.isToday }"
+            @click="emit('dateClick', day.date)"
           >
-            <div class="font-medium truncate">{{ event.title }}</div>
-            <div class="flex items-center gap-1 mt-0.5 opacity-75">
-              <component :is="getStatusIcon(event.status)" class="h-3 w-3" />
-              <span class="capitalize">{{ event.status }}</span>
-              <span v-if="event.days > 1" class="text-xs">({{ event.days }}d)</span>
+            <!-- Single-day events only -->
+            <div
+              v-for="event in day.events"
+              :key="event.id"
+              class="text-xs p-1.5 rounded cursor-pointer hover:shadow-sm transition-all mb-1"
+              :style="{ backgroundColor: event.backgroundColor, borderLeft: `3px solid ${event.borderColor}` }"
+              @click.stop="emit('eventClick', event)"
+            >
+              <div class="font-medium truncate">{{ event.title }}</div>
+              <div class="flex items-center gap-1 mt-0.5 opacity-75">
+                <component :is="getStatusIcon(event.status || 'pending')" class="h-3 w-3" />
+                <span class="capitalize">{{ event.status }}</span>
+              </div>
+            </div>
+
+            <!-- Single-day team events -->
+            <div
+              v-for="event in day.teamEvents"
+              :key="`team-${event.id}`"
+              v-show="showTeamEvents"
+              class="text-xs p-1.5 rounded cursor-pointer hover:shadow-sm transition-all border border-dashed mb-1"
+              :style="{ backgroundColor: event.backgroundColor + '40', borderColor: event.borderColor }"
+              @click.stop="emit('eventClick', event)"
+            >
+              <div class="flex items-center gap-1">
+                <Users class="h-3 w-3" />
+                <div class="font-medium truncate">{{ event.title }}</div>
+              </div>
+              <div class="opacity-75 truncate">{{ event.user_name }}</div>
             </div>
           </div>
-
-          <!-- Team events -->
-          <div
-            v-for="event in day.teamEvents"
-            :key="`team-${event.id}`"
-            v-show="showTeamEvents"
-            class="text-xs p-1.5 rounded cursor-pointer hover:shadow-sm transition-all border border-dashed"
-            :style="{ backgroundColor: event.backgroundColor + '40', borderColor: event.borderColor }"
-            @click.stop="emit('eventClick', event)"
-          >
-            <div class="flex items-center gap-1">
-              <Users class="h-3 w-3" />
-              <div class="font-medium truncate">{{ event.title }}</div>
-            </div>
-            <div class="opacity-75 truncate">{{ event.user_name }}</div>
+          
+          <!-- Multi-day event strips overlay -->
+          <div class="absolute top-2 left-0 right-0 pointer-events-none">
+            <CalendarEventStrip
+              v-for="strip in eventStrips"
+              :key="`strip-${strip.event.id}`"
+              :event="strip.event"
+              :start-col="strip.startCol"
+              :span-cols="strip.spanCols"
+              :row="strip.stripRow"
+              :grid-start-date="weekStart"
+              :can-edit="strip.event.extendedProps?.isOwnRequest && strip.event.status === 'pending'"
+              class="pointer-events-auto"
+              @event-click="emit('eventClick', strip.event)"
+              @edit-event="emit('editEvent', strip.event)"
+              @start-horizontal-resize="(mouseEvent, eventData, direction) => emit('startHorizontalResize', mouseEvent, eventData, direction)"
+              @start-vertical-resize="(mouseEvent, eventData, direction) => emit('startVerticalResize', mouseEvent, eventData, direction)"
+              @start-move="(mouseEvent, eventData) => emit('startMove', mouseEvent, eventData)"
+            />
           </div>
         </div>
       </div>
